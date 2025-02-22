@@ -17,19 +17,19 @@ fn test_pod_builder() {
     let mut buf = [0u8; 1024];
     let builder = Builder::new(&mut buf);
     let res = builder
-        .none()
-        .bool(true)
-        .id(Id(1))
-        .int(2)
-        .long(3)
-        .float(4.0)
-        .double(5.0)
-        .string("hello")
-        .bytes(&[6, 7, 8, 9])
-        .pointer(Type::Int, 0xdeadc0de as *const c_void)
-        .fd(-1)
-        .rectangle(1920, 1080)
-        .fraction(30001, 1)
+        .push_none()
+        .push_bool(true)
+        .push_id(Id(1))
+        .push_int(2)
+        .push_long(3)
+        .push_float(4.0)
+        .push_double(5.0)
+        .push_string("hello")
+        .push_bytes(&[6, 7, 8, 9])
+        .push_pointer(Type::Int, 0xdeadc0de as *const c_void)
+        .push_fd(-1)
+        .push_rectangle(1920, 1080)
+        .push_fraction(30001, 1)
         .build()
         .unwrap();
 

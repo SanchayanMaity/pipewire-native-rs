@@ -32,7 +32,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub fn pod<T, U: Pod<T>>(mut self, value: U) -> Self {
+    pub fn push_pod<T, U: Pod<T>>(mut self, value: U) -> Self {
         if self.error.is_none() {
             match value.encode(&mut self.data[self.pos..]) {
                 Ok(size) => self.pos += size,
@@ -43,58 +43,58 @@ impl<'a> Builder<'a> {
         self
     }
 
-    pub fn none(self) -> Self {
-        self.pod(())
+    pub fn push_none(self) -> Self {
+        self.push_pod(())
     }
 
-    pub fn bool(self, value: bool) -> Self {
-        self.pod(value)
+    pub fn push_bool(self, value: bool) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn id(self, value: Id) -> Self {
-        self.pod(value)
+    pub fn push_id(self, value: Id) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn int(self, value: i32) -> Self {
-        self.pod(value)
+    pub fn push_int(self, value: i32) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn long(self, value: i64) -> Self {
-        self.pod(value)
+    pub fn push_long(self, value: i64) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn float(self, value: f32) -> Self {
-        self.pod(value)
+    pub fn push_float(self, value: f32) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn double(self, value: f64) -> Self {
-        self.pod(value)
+    pub fn push_double(self, value: f64) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn string(self, value: &str) -> Self {
-        self.pod(value)
+    pub fn push_string(self, value: &str) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn bytes(self, value: &[u8]) -> Self {
-        self.pod(value)
+    pub fn push_bytes(self, value: &[u8]) -> Self {
+        self.push_pod(value)
     }
 
-    pub fn pointer(self, typ: Type, value: *const c_void) -> Self {
-        self.pod(Pointer {
+    pub fn push_pointer(self, typ: Type, value: *const c_void) -> Self {
+        self.push_pod(Pointer {
             type_: typ,
             ptr: value,
         })
     }
 
-    pub fn fd(self, value: RawFd) -> Self {
-        self.pod(Fd(value))
+    pub fn push_fd(self, value: RawFd) -> Self {
+        self.push_pod(Fd(value))
     }
 
-    pub fn rectangle(self, width: u32, height: u32) -> Self {
-        self.pod(Rectangle { width, height })
+    pub fn push_rectangle(self, width: u32, height: u32) -> Self {
+        self.push_pod(Rectangle { width, height })
     }
 
-    pub fn fraction(self, num: u32, denom: u32) -> Self {
-        self.pod(Fraction { num, denom })
+    pub fn push_fraction(self, num: u32, denom: u32) -> Self {
+        self.push_pod(Fraction { num, denom })
     }
 }
