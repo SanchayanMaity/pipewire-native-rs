@@ -5,6 +5,7 @@
 use std::ffi::c_void;
 
 use pipewire_native::spa::pod::builder::Builder;
+use pipewire_native::spa::pod::parser::Parser;
 use pipewire_native::spa::pod::types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
 use pipewire_native::spa::pod::Pod;
 
@@ -100,4 +101,59 @@ fn test_pod_decode() {
         num: 30001,
         denom: 1,
     });
+}
+
+#[test]
+fn test_pod_parser() {
+    let mut buf = [0u8; 1024];
+    let builder = Builder::new(&mut buf);
+    let res = builder
+        .push_none()
+        .push_bool(true)
+        .push_id(Id(1))
+        .push_int(2)
+        .push_long(3)
+        .push_float(4.0)
+        .push_double(5.0)
+        .push_string("hello")
+        .push_bytes(&[6, 7, 8, 9])
+        .push_pointer(Type::Int, 0xdeadc0de as *const c_void)
+        .push_fd(-1)
+        .push_rectangle(1920, 1080)
+        .push_fraction(30001, 1)
+        .build()
+        .unwrap();
+
+    let mut parser = Parser::new(&res);
+    assert_eq!(parser.pop_none().unwrap(), ());
+    assert_eq!(parser.pop_bool().unwrap(), true);
+    assert_eq!(parser.pop_id().unwrap(), Id(1));
+    assert_eq!(parser.pop_int().unwrap(), 2);
+    assert_eq!(parser.pop_long().unwrap(), 3);
+    assert_eq!(parser.pop_float().unwrap(), 4.0);
+    assert_eq!(parser.pop_double().unwrap(), 5.0);
+    assert_eq!(parser.pop_string().unwrap(), "hello");
+    assert_eq!(parser.pop_bytes().unwrap(), vec![6, 7, 8, 9]);
+    assert_eq!(
+        parser.pop_pointer().unwrap(),
+        Pointer {
+            type_: Type::Int,
+            ptr: 0xdeadc0de as *const c_void,
+        }
+    );
+    assert_eq!(parser.pop_fd().unwrap(), Fd(-1));
+    assert_eq!(
+        parser.pop_rectangle().unwrap(),
+        Rectangle {
+            width: 1920,
+            height: 1080,
+        }
+    );
+    assert_eq!(
+        parser.pop_fraction().unwrap(),
+        Fraction {
+            num: 30001,
+            denom: 1,
+        }
+    );
 }

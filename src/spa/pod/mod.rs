@@ -4,12 +4,16 @@
 
 pub mod builder;
 pub mod error;
+pub mod parser;
 pub mod types;
+
+mod internal;
 
 use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 use error::Error;
+use internal::primitive_pod_size;
 use types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
 
 // T is the type we decode to (which might need to be the owned version for things like slices)
@@ -18,24 +22,8 @@ pub trait Pod<T> {
     fn decode(data: &[u8]) -> Result<(T, usize), Error>;
 }
 
-fn fixed_type_size(t: Type) -> (usize, usize) {
-    match t {
-        Type::None => (0, 0),
-        Type::Bool => (4, 4),
-        Type::Id => (4, 4),
-        Type::Int => (4, 4),
-        Type::Long => (8, 0),
-        Type::Float => (4, 4),
-        Type::Double => (8, 0),
-        Type::Fd => (8, 0),
-        Type::Rectangle => (8, 0),
-        Type::Fraction => (8, 0),
-        _ => unreachable!(),
-    }
-}
-
 fn write_header_fixed(data: &mut [u8], t: Type) -> Result<usize, Error> {
-    let (size, padding) = fixed_type_size(t);
+    let (size, padding) = primitive_pod_size(t);
 
     if data.len() < 8 + size + padding {
         Err(Error::NoSpace)
@@ -47,7 +35,7 @@ fn write_header_fixed(data: &mut [u8], t: Type) -> Result<usize, Error> {
 }
 
 fn decode_header_fixed(data: &[u8], t: Type) -> Result<usize, Error> {
-    let (size, padding) = fixed_type_size(t);
+    let (size, padding) = primitive_pod_size(t);
 
     if data.len() < 8 + size + padding {
         Err(Error::Invalid)
