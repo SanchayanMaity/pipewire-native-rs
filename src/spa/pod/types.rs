@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use std::ffi::c_void;
+use std::os::fd::RawFd;
+
 // spa/utils/type.h: Basic SPA_TYPE_*
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Type {
@@ -30,6 +33,16 @@ pub enum Type {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Id(pub u32);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Pointer {
+    pub type_: Type,
+    pub ptr: *const c_void,
+}
+
+// We can't directly use RawFd because it conflicts with i32 (being a type alias for it)
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Fd(pub RawFd);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Rectangle {

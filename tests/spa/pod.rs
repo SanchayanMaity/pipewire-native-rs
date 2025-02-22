@@ -5,7 +5,7 @@
 use std::ffi::c_void;
 
 use pipewire_native::spa::pod::builder::Builder;
-use pipewire_native::spa::pod::types::{Id, Rectangle, Type};
+use pipewire_native::spa::pod::types::{Id, Type};
 
 use libspa::pod as spa_pod;
 use libspa::sys as spa_sys;
@@ -27,10 +27,8 @@ fn test_pod_builder() {
         .bytes(&[6, 7, 8, 9])
         .pointer(Type::Int, 0xdeadc0de as *const c_void)
         .fd(-1)
-        .rectangle(Rectangle {
-            width: 1920,
-            height: 1080,
-        })
+        .rectangle(1920, 1080)
+        .fraction(30001, 1)
         .build()
         .unwrap();
 
@@ -58,6 +56,12 @@ fn test_pod_builder() {
         .add_rectangle(spa_utils::Rectangle {
             width: 1920,
             height: 1080,
+        })
+        .unwrap();
+    sbuilder
+        .add_fraction(spa_utils::Fraction {
+            num: 30001,
+            denom: 1,
         })
         .unwrap();
 
