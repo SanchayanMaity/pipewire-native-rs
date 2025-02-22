@@ -32,7 +32,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub fn pod<T: Pod>(mut self, value: T) -> Self {
+    pub fn pod<T, U: Pod<T>>(mut self, value: U) -> Self {
         if self.error.is_none() {
             match value.encode(&mut self.data[self.pos..]) {
                 Ok(size) => self.pos += size,

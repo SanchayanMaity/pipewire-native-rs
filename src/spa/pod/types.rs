@@ -6,6 +6,7 @@ use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 // spa/utils/type.h: Basic SPA_TYPE_*
+#[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Type {
     Start = 0,
