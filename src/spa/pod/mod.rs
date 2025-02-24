@@ -370,6 +370,22 @@ impl Pod for &[u8] {
     }
 }
 
+// Pointer is encoded as:
+//
+// +--------------+
+// |  total size  | 4 bytes
+// +--------------+
+// |   pod type   | 4 bytes
+// +--------------+
+// |   ptr size   | 4 bytes
+// +--------------+
+// | pointee type | 4 bytes
+// +--------------+
+// | pointer val  | 4 or 8 bytes
+// +--------------+
+// |   padding?   | 4 bytes
+// +--------------+
+//
 impl Pod for Pointer {
     type DecodesTo = Pointer;
 
