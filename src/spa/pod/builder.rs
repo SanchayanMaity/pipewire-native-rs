@@ -7,7 +7,7 @@ use std::os::fd::RawFd;
 
 use super::error::Error;
 use super::types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
-use super::Pod;
+use super::{Pod, Primitive};
 
 pub struct Builder<'a> {
     data: &'a mut [u8],
@@ -71,6 +71,18 @@ impl<'a> Builder<'a> {
         self.push_pod(value)
     }
 
+    pub fn push_fd(self, value: RawFd) -> Self {
+        self.push_pod(Fd(value))
+    }
+
+    pub fn push_rectangle(self, width: u32, height: u32) -> Self {
+        self.push_pod(Rectangle { width, height })
+    }
+
+    pub fn push_fraction(self, num: u32, denom: u32) -> Self {
+        self.push_pod(Fraction { num, denom })
+    }
+
     pub fn push_string(self, value: &str) -> Self {
         self.push_pod(value)
     }
@@ -86,15 +98,10 @@ impl<'a> Builder<'a> {
         })
     }
 
-    pub fn push_fd(self, value: RawFd) -> Self {
-        self.push_pod(Fd(value))
-    }
-
-    pub fn push_rectangle(self, width: u32, height: u32) -> Self {
-        self.push_pod(Rectangle { width, height })
-    }
-
-    pub fn push_fraction(self, num: u32, denom: u32) -> Self {
-        self.push_pod(Fraction { num, denom })
+    pub fn push_array<T>(self, values: &[T]) -> Self
+    where
+        T: Pod + Primitive,
+    {
+        self.push_pod(values)
     }
 }

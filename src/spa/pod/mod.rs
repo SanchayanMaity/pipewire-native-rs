@@ -21,7 +21,7 @@ pub trait Pod {
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error>;
 }
 
-trait Primitive {
+pub trait Primitive {
     fn pod_type() -> Type;
     fn pod_size() -> usize;
 
@@ -436,5 +436,82 @@ impl Pod for Pointer {
         };
 
         Ok((Pointer { type_, ptr }, 8 + size + padding))
+    }
+}
+
+// Array is encoded as:
+//
+// +--------------+
+// |  total size  | 4 bytes
+// +--------------+
+// |   pod type   | 4 bytes
+// +--------------+
+// | 1 child size | 4 bytes
+// +--------------+
+// |  child type  | 4 bytes
+// +--------------+
+// |  elem data   |
+// |    bodies    | 4 bytes
+// +--------------+
+// |   padding?   | 4 bytes
+// +--------------+
+//
+impl<T> Pod for &[T]
+where
+    T: Primitive + Pod,
+{
+    type DecodesTo = Vec<T>;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        let child_size = T::pod_size();
+        let child_type = T::pod_type();
+        let elems_size = child_size * self.len();
+        let padding = pad_8(elems_size);
+
+        if data.len() < 8 + 8 + elems_size + padding {
+            return Err(Error::NoSpace);
+        }
+
+        data[0..4].copy_from_slice(&(8 + elems_size as u32).to_ne_bytes());
+        data[4..8].copy_from_slice(&(Type::Array as u32).to_ne_bytes());
+        data[8..12].copy_from_slice(&(child_size as u32).to_ne_bytes());
+        data[12..16].copy_from_slice(&(child_type as u32).to_ne_bytes());
+
+        for i in 0..self.len() {
+            self[i].encode_body(&mut data[16 + i * child_size..])?;
+        }
+
+        Ok(8 + 8 + elems_size + padding)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Vec<T>, usize), Error> {
+        let mut res = Vec::new();
+
+        if data.len() < 16 {
+            return Err(Error::Invalid);
+        }
+
+        let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
+        let padding = pad_8(size);
+
+        if data.len() < 8 + size + padding {
+            return Err(Error::Invalid);
+        }
+
+        if Ok(Type::Array) != u32::from_ne_bytes(data[4..8].try_into().unwrap()).try_into() {
+            return Err(Error::Invalid);
+        }
+
+        let child_size = u32::from_ne_bytes(data[8..12].try_into().unwrap()) as usize;
+        if Ok(T::pod_type()) != u32::from_ne_bytes(data[12..16].try_into().unwrap()).try_into() {
+            return Err(Error::Invalid);
+        }
+
+        for i in 0..(size - 8) / child_size {
+            let val = T::decode_body(&data[16 + i * child_size..])?;
+            res.push(val);
+        }
+
+        Ok((res, 8 + size + padding))
     }
 }

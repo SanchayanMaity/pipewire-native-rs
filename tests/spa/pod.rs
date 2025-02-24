@@ -31,6 +31,7 @@ fn test_pod_builder() {
         .push_fd(-1)
         .push_rectangle(1920, 1080)
         .push_fraction(30001, 1)
+        .push_array(&[11.0f32, 12.0, 13.0])
         .build()
         .unwrap();
 
@@ -66,6 +67,16 @@ fn test_pod_builder() {
             denom: 1,
         })
         .unwrap();
+    unsafe {
+        sbuilder
+            .add_array(
+                4,
+                spa_sys::SPA_TYPE_Float,
+                3,
+                [11.0f32, 12.0, 13.0].as_ptr() as *const c_void,
+            )
+            .unwrap();
+    }
 
     assert_eq!(res, sbuf.as_slice());
 }
@@ -104,6 +115,7 @@ fn test_pod_decode() {
         num: 30001,
         denom: 1,
     });
+    test_a_pod(&vec![11.0f32, 12.0, 13.0].as_slice());
 }
 
 #[test]
@@ -124,6 +136,7 @@ fn test_pod_parser() {
         .push_fd(-1)
         .push_rectangle(1920, 1080)
         .push_fraction(30001, 1)
+        .push_array(&[11.0f32, 12.0, 13.0])
         .build()
         .unwrap();
 
@@ -158,5 +171,9 @@ fn test_pod_parser() {
             num: 30001,
             denom: 1,
         }
+    );
+    assert_eq!(
+        parser.pop_array::<f32>().unwrap(),
+        vec![11.0f32, 12.0, 13.0]
     );
 }

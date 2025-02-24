@@ -4,7 +4,7 @@
 
 use super::error::Error;
 use super::types::{Fd, Fraction, Id, Pointer, Rectangle};
-use super::Pod;
+use super::{Pod, Primitive};
 
 pub struct Parser<'a> {
     data: &'a [u8],
@@ -74,5 +74,12 @@ impl<'a> Parser<'a> {
 
     pub fn pop_fraction(&mut self) -> Result<Fraction, Error> {
         self.pop_pod::<Fraction>()
+    }
+
+    pub fn pop_array<T>(&mut self) -> Result<Vec<T>, Error>
+    where
+        T: Pod + Primitive,
+    {
+        self.pop_pod::<&[T]>()
     }
 }
