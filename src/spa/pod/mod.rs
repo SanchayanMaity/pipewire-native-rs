@@ -31,6 +31,14 @@ trait Primitive {
         Self: Sized;
 }
 
+fn pad_8(size: usize) -> usize {
+    if size % 8 > 0 {
+        8 - size % 8
+    } else {
+        0
+    }
+}
+
 impl<T> Pod for T
 where
     T: Primitive,
@@ -39,7 +47,7 @@ where
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = Self::pod_size();
-        let padding = if size % 8 != 0 { 8 - size % 8 } else { 0 };
+        let padding = pad_8(size);
 
         if data.len() < 8 + size + padding {
             return Err(Error::NoSpace);
@@ -50,7 +58,7 @@ where
 
         self.encode_body(&mut data[8..])?;
 
-        if size % 8 > 0 {
+        if padding > 0 {
             data[8 + size..8 + size + padding].copy_from_slice(&[0; 8][0..padding]);
         }
 
@@ -73,7 +81,7 @@ where
         }
 
         let val = Self::decode_body(&data[8..])?;
-        let padding = if size % 8 != 0 { 8 - size % 8 } else { 0 };
+        let padding = pad_8(size);
         Ok((val, 8 + size + padding))
     }
 }
@@ -287,7 +295,7 @@ impl Pod for &str {
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let len = self.len() + 1;
-        let padding = 8 - len % 8;
+        let padding = pad_8(len);
 
         if len as u32 > u32::MAX || data.len() < 8 + len + padding {
             return Err(Error::NoSpace);
@@ -306,7 +314,7 @@ impl Pod for &str {
 
     fn decode(data: &[u8]) -> Result<(String, usize), Error> {
         let len = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
-        let padding = 8 - len % 8;
+        let padding = pad_8(len);
 
         if data.len() < 8 + len {
             return Err(Error::Invalid);
@@ -331,7 +339,7 @@ impl Pod for &[u8] {
 
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let len = self.len();
-        let padding = 8 - len % 8;
+        let padding = pad_8(len);
 
         if len as u32 > u32::MAX || data.len() < 8 + len + padding {
             return Err(Error::NoSpace);
@@ -348,7 +356,7 @@ impl Pod for &[u8] {
 
     fn decode(data: &[u8]) -> Result<(Vec<u8>, usize), Error> {
         let len = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
-        let padding = 8 - len % 8;
+        let padding = pad_8(len);
 
         if data.len() < 8 + len {
             return Err(Error::Invalid);
