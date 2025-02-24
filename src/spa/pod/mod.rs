@@ -409,9 +409,10 @@ impl Pod for Pointer {
             return Err(Error::Invalid);
         }
 
-        // FIXME: we should be able to do better than this
-        let type_ =
-            unsafe { std::mem::transmute(u32::from_ne_bytes(data[8..12].try_into().unwrap())) };
+        let type_ = match u32::from_ne_bytes(data[8..12].try_into().unwrap()).try_into() {
+            Ok(t) => t,
+            Err(_) => return Err(Error::Invalid),
+        };
         let ptr = if ptr_size == 8 {
             u64::from_ne_bytes(data[16..24].try_into().unwrap()) as *const c_void
         } else {

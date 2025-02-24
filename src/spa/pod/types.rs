@@ -32,6 +32,37 @@ pub enum Type {
     Pod,
 }
 
+impl TryFrom<u32> for Type {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Start),
+            1 => Ok(Self::None),
+            2 => Ok(Self::Bool),
+            3 => Ok(Self::Id),
+            4 => Ok(Self::Int),
+            5 => Ok(Self::Long),
+            6 => Ok(Self::Float),
+            7 => Ok(Self::Double),
+            8 => Ok(Self::String),
+            9 => Ok(Self::Bytes),
+            10 => Ok(Self::Rectangle),
+            11 => Ok(Self::Fraction),
+            12 => Ok(Self::Bitmap),
+            13 => Ok(Self::Array),
+            14 => Ok(Self::Struct),
+            15 => Ok(Self::Object),
+            16 => Ok(Self::Sequence),
+            17 => Ok(Self::Pointer),
+            18 => Ok(Self::Fd),
+            19 => Ok(Self::Choice),
+            20 => Ok(Self::Pod),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Id(pub u32);
 
