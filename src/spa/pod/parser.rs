@@ -11,7 +11,7 @@ pub struct Parser<'a> {
     pos: usize,
 }
 
-impl<'a> Parser<'_> {
+impl<'a> Parser<'a> {
     pub fn new(data: &'a [u8]) -> Parser<'a> {
         Parser { data, pos: 0 }
     }
