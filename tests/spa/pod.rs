@@ -32,6 +32,7 @@ fn test_pod_builder() {
         .push_rectangle(1920, 1080)
         .push_fraction(30001, 1)
         .push_array(&[11.0f32, 12.0, 13.0])
+        .push_array::<bool>(&[])
         .build()
         .unwrap();
 
@@ -75,6 +76,11 @@ fn test_pod_builder() {
                 3,
                 [11.0f32, 12.0, 13.0].as_ptr() as *const c_void,
             )
+            .unwrap();
+    }
+    unsafe {
+        sbuilder
+            .add_array(4, spa_sys::SPA_TYPE_Bool, 0, [].as_ptr() as *const c_void)
             .unwrap();
     }
 
