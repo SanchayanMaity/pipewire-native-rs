@@ -7,13 +7,10 @@ pub mod error;
 pub mod parser;
 pub mod types;
 
-mod internal;
-
 use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 use error::Error;
-use internal::primitive_pod_size;
 use types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
 
 pub trait Pod {
@@ -24,157 +21,264 @@ pub trait Pod {
     fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error>;
 }
 
-fn write_header_fixed(data: &mut [u8], t: Type) -> Result<usize, Error> {
-    let (size, padding) = primitive_pod_size(t);
+trait Primitive {
+    fn pod_type() -> Type;
+    fn pod_size() -> usize;
 
-    if data.len() < 8 + size + padding {
-        Err(Error::NoSpace)
-    } else {
-        data[0..4].copy_from_slice(&(size as u32).to_ne_bytes());
-        data[4..8].copy_from_slice(&(t as u32).to_ne_bytes());
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error>;
+    fn decode_body(data: &[u8]) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+
+impl<T> Pod for T
+where
+    T: Primitive,
+{
+    type DecodesTo = Self;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        let size = Self::pod_size();
+        let padding = if size % 8 != 0 { 8 - size % 8 } else { 0 };
+
+        if data.len() < 8 + size + padding {
+            return Err(Error::NoSpace);
+        }
+
+        data[0..4].copy_from_slice(&(Self::pod_size() as u32).to_ne_bytes());
+        data[4..8].copy_from_slice(&(Self::pod_type() as u32).to_ne_bytes());
+
+        self.encode_body(&mut data[8..])?;
+
+        if size % 8 > 0 {
+            data[8 + size..8 + size + padding].copy_from_slice(&[0; 8][0..padding]);
+        }
+
         Ok(8 + size + padding)
     }
-}
 
-fn decode_header_fixed(data: &[u8], t: Type) -> Result<usize, Error> {
-    let (size, padding) = primitive_pod_size(t);
+    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
+        if data.len() < 16 {
+            return Err(Error::Invalid);
+        }
 
-    if data.len() < 8 + size + padding {
-        Err(Error::Invalid)
-    } else if data[0..4] != (size as u32).to_ne_bytes() {
-        return Err(Error::Invalid);
-    } else if data[4..8] != (t as u32).to_ne_bytes() {
-        return Err(Error::Invalid);
-    } else {
-        Ok(8 + size + padding)
+        let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
+        if size != Self::pod_size() {
+            return Err(Error::Invalid);
+        }
+
+        let t = u32::from_ne_bytes(data[4..8].try_into().unwrap());
+        if t != Self::pod_type() as u32 {
+            return Err(Error::Invalid);
+        }
+
+        let val = Self::decode_body(&data[8..])?;
+        let padding = if size % 8 != 0 { 8 - size % 8 } else { 0 };
+        Ok((val, 8 + size + padding))
     }
 }
 
-impl Pod for () {
-    type DecodesTo = ();
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        write_header_fixed(data, Type::None)
+impl Primitive for () {
+    fn pod_type() -> Type {
+        Type::None
     }
 
-    fn decode(data: &[u8]) -> Result<(Self, usize), Error> {
-        decode_header_fixed(data, Type::None).map(|s| ((), s))
-    }
-}
-
-impl Pod for bool {
-    type DecodesTo = bool;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Bool)?;
-
-        data[8..12].copy_from_slice(&(*self as u32).to_ne_bytes());
-
-        Ok(size)
+    fn pod_size() -> usize {
+        0
     }
 
-    fn decode(data: &[u8]) -> Result<(Self, usize), Error> {
-        let size = decode_header_fixed(data, Type::Bool)?;
-        let val = u32::from_ne_bytes(data[8..12].try_into().unwrap()) != 0;
+    fn encode_body(&self, _data: &mut [u8]) -> Result<(), Error> {
+        Ok(())
+    }
 
-        Ok((val, size))
+    fn decode_body(_data: &[u8]) -> Result<Self, Error> {
+        Ok(())
     }
 }
 
-impl Pod for Id {
-    type DecodesTo = Id;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Id)?;
-
-        data[8..12].copy_from_slice(&self.0.to_ne_bytes());
-
-        Ok(size)
+impl Primitive for bool {
+    fn pod_type() -> Type {
+        Type::Bool
     }
 
-    fn decode(data: &[u8]) -> Result<(Self, usize), Error> {
-        let size = decode_header_fixed(data, Type::Id)?;
-        let val = u32::from_ne_bytes(data[8..12].try_into().unwrap());
-
-        Ok((Id(val), size))
-    }
-}
-
-impl Pod for i32 {
-    type DecodesTo = i32;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Int)?;
-
-        data[8..12].copy_from_slice(&self.to_ne_bytes());
-        data[12..16].copy_from_slice(&[0, 0, 0, 0]);
-
-        Ok(size)
+    fn pod_size() -> usize {
+        4
     }
 
-    fn decode(data: &[u8]) -> Result<(Self, usize), Error> {
-        let size = decode_header_fixed(data, Type::Int)?;
-        let val = i32::from_ne_bytes(data[8..12].try_into().unwrap());
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..4].copy_from_slice(&(*self as u32).to_ne_bytes());
+        Ok(())
+    }
 
-        Ok((val, size))
+    fn decode_body(data: &[u8]) -> Result<Self, Error> {
+        let val = u32::from_ne_bytes(data[0..4].try_into().unwrap()) != 0;
+        Ok(val)
     }
 }
 
-impl Pod for i64 {
-    type DecodesTo = i64;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Long)?;
-
-        data[8..16].copy_from_slice(&self.to_ne_bytes());
-
-        Ok(size)
+impl Primitive for Id {
+    fn pod_type() -> Type {
+        Type::Id
     }
 
-    fn decode(data: &[u8]) -> Result<(Self, usize), Error> {
-        let size = decode_header_fixed(data, Type::Long)?;
-        let val = i64::from_ne_bytes(data[8..16].try_into().unwrap());
-
-        Ok((val, size))
-    }
-}
-
-impl Pod for f32 {
-    type DecodesTo = f32;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Float)?;
-
-        data[8..12].copy_from_slice(&self.to_ne_bytes());
-        data[12..16].copy_from_slice(&[0, 0, 0, 0]);
-
-        Ok(size)
+    fn pod_size() -> usize {
+        4
     }
 
-    fn decode(data: &[u8]) -> Result<(Self, usize), Error> {
-        let size = decode_header_fixed(data, Type::Float)?;
-        let val = f32::from_ne_bytes(data[8..12].try_into().unwrap());
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..4].copy_from_slice(&self.0.to_ne_bytes());
+        Ok(())
+    }
 
-        Ok((val, size))
+    fn decode_body(data: &[u8]) -> Result<Self, Error> {
+        let val = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+        Ok(Id(val))
     }
 }
 
-impl Pod for f64 {
-    type DecodesTo = f64;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Double)?;
-
-        data[8..16].copy_from_slice(&self.to_ne_bytes());
-
-        Ok(size)
+impl Primitive for i32 {
+    fn pod_type() -> Type {
+        Type::Int
     }
 
-    fn decode(data: &[u8]) -> Result<(Self, usize), Error> {
-        let size = decode_header_fixed(data, Type::Double)?;
-        let val = f64::from_ne_bytes(data[8..16].try_into().unwrap());
+    fn pod_size() -> usize {
+        4
+    }
 
-        Ok((val, size))
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..4].copy_from_slice(&self.to_ne_bytes());
+        Ok(())
+    }
+
+    fn decode_body(data: &[u8]) -> Result<Self, Error> {
+        let val = i32::from_ne_bytes(data[0..4].try_into().unwrap());
+        Ok(val)
+    }
+}
+
+impl Primitive for i64 {
+    fn pod_type() -> Type {
+        Type::Long
+    }
+
+    fn pod_size() -> usize {
+        8
+    }
+
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..8].copy_from_slice(&self.to_ne_bytes());
+        Ok(())
+    }
+
+    fn decode_body(data: &[u8]) -> Result<Self, Error> {
+        let val = i64::from_ne_bytes(data[0..8].try_into().unwrap());
+        Ok(val)
+    }
+}
+
+impl Primitive for f32 {
+    fn pod_type() -> Type {
+        Type::Float
+    }
+
+    fn pod_size() -> usize {
+        4
+    }
+
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..4].copy_from_slice(&self.to_ne_bytes());
+        Ok(())
+    }
+
+    fn decode_body(data: &[u8]) -> Result<Self, Error> {
+        let val = f32::from_ne_bytes(data[0..4].try_into().unwrap());
+        Ok(val)
+    }
+}
+
+impl Primitive for f64 {
+    fn pod_type() -> Type {
+        Type::Double
+    }
+
+    fn pod_size() -> usize {
+        8
+    }
+
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..8].copy_from_slice(&self.to_ne_bytes());
+        Ok(())
+    }
+
+    fn decode_body(data: &[u8]) -> Result<Self, Error> {
+        let val = f64::from_ne_bytes(data[0..8].try_into().unwrap());
+        Ok(val)
+    }
+}
+
+impl Primitive for Fd {
+    fn pod_type() -> Type {
+        Type::Fd
+    }
+
+    fn pod_size() -> usize {
+        8
+    }
+
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..8].copy_from_slice(&(self.0 as i64).to_ne_bytes());
+        Ok(())
+    }
+
+    fn decode_body(data: &[u8]) -> Result<Fd, Error> {
+        let val = i64::from_ne_bytes(data[0..8].try_into().unwrap());
+        Ok(Fd(val as RawFd))
+    }
+}
+
+impl Primitive for Rectangle {
+    fn pod_type() -> Type {
+        Type::Rectangle
+    }
+
+    fn pod_size() -> usize {
+        8
+    }
+
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..4].copy_from_slice(&self.width.to_ne_bytes());
+        data[4..8].copy_from_slice(&self.height.to_ne_bytes());
+        Ok(())
+    }
+
+    fn decode_body(data: &[u8]) -> Result<Rectangle, Error> {
+        let width = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+        let height = u32::from_ne_bytes(data[4..8].try_into().unwrap());
+
+        Ok(Rectangle { width, height })
+    }
+}
+
+impl Primitive for Fraction {
+    fn pod_type() -> Type {
+        Type::Fraction
+    }
+
+    fn pod_size() -> usize {
+        8
+    }
+
+    fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
+        data[0..4].copy_from_slice(&self.num.to_ne_bytes());
+        data[4..8].copy_from_slice(&self.denom.to_ne_bytes());
+        Ok(())
+    }
+
+    fn decode_body(data: &[u8]) -> Result<Fraction, Error> {
+        let num = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+        let denom = u32::from_ne_bytes(data[4..8].try_into().unwrap());
+
+        Ok(Fraction { num, denom })
     }
 }
 
@@ -307,66 +411,5 @@ impl Pod for Pointer {
         };
 
         Ok((Pointer { type_, ptr }, 8 + size + padding))
-    }
-}
-
-impl Pod for Fd {
-    type DecodesTo = Fd;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Fd)?;
-
-        data[8..16].copy_from_slice(&(self.0 as i64).to_ne_bytes());
-
-        Ok(size)
-    }
-
-    fn decode(data: &[u8]) -> Result<(Fd, usize), Error> {
-        let size = decode_header_fixed(data, Type::Fd)?;
-        let val = i64::from_ne_bytes(data[8..16].try_into().unwrap());
-
-        Ok((Fd(val as RawFd), size))
-    }
-}
-
-impl Pod for Rectangle {
-    type DecodesTo = Rectangle;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Rectangle)?;
-
-        data[8..12].copy_from_slice(&self.width.to_ne_bytes());
-        data[12..16].copy_from_slice(&self.height.to_ne_bytes());
-
-        Ok(size)
-    }
-
-    fn decode(data: &[u8]) -> Result<(Rectangle, usize), Error> {
-        let size = decode_header_fixed(data, Type::Rectangle)?;
-        let width = u32::from_ne_bytes(data[8..12].try_into().unwrap());
-        let height = u32::from_ne_bytes(data[12..16].try_into().unwrap());
-
-        Ok((Rectangle { width, height }, size))
-    }
-}
-
-impl Pod for Fraction {
-    type DecodesTo = Fraction;
-
-    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
-        let size = write_header_fixed(data, Type::Fraction)?;
-
-        data[8..12].copy_from_slice(&self.num.to_ne_bytes());
-        data[12..16].copy_from_slice(&self.denom.to_ne_bytes());
-
-        Ok(size)
-    }
-
-    fn decode(data: &[u8]) -> Result<(Fraction, usize), Error> {
-        let size = decode_header_fixed(data, Type::Fraction)?;
-        let num = u32::from_ne_bytes(data[8..12].try_into().unwrap());
-        let denom = u32::from_ne_bytes(data[12..16].try_into().unwrap());
-
-        Ok((Fraction { num, denom }, size))
     }
 }
