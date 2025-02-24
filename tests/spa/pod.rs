@@ -70,14 +70,17 @@ fn test_pod_builder() {
     assert_eq!(res, sbuf.as_slice());
 }
 
-fn test_a_pod<U: From<T> + std::cmp::PartialEq + std::fmt::Debug, T: Copy + Pod<U>>(pod: &T) {
+fn test_a_pod<T: Copy + Pod>(pod: &T)
+where
+    <T as Pod>::DecodesTo: From<T> + std::cmp::PartialEq + std::fmt::Debug,
+{
     let mut buf = [0u8; 1024];
 
     let size = pod.encode(&mut buf).unwrap();
     let (rv, rsize) = T::decode(&buf).unwrap();
 
     assert_eq!(size, rsize);
-    assert_eq!(U::from(*pod), rv);
+    assert_eq!(<T as Pod>::DecodesTo::from(*pod), rv);
 }
 
 #[test]

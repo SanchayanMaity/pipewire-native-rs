@@ -16,7 +16,7 @@ impl<'a> Parser<'_> {
         Parser { data, pos: 0 }
     }
 
-    pub fn pop_pod<T, U: Pod<T>>(&mut self) -> Result<T, Error> {
+    pub fn pop_pod<U: Pod>(&mut self) -> Result<<U as Pod>::DecodesTo, Error> {
         let (res, size) = U::decode(&self.data[self.pos..])?;
 
         self.pos += size;
@@ -25,54 +25,54 @@ impl<'a> Parser<'_> {
     }
 
     pub fn pop_none(&mut self) -> Result<(), Error> {
-        self.pop_pod::<_, ()>()
+        self.pop_pod::<()>()
     }
 
     pub fn pop_bool(&mut self) -> Result<bool, Error> {
-        self.pop_pod::<_, bool>()
+        self.pop_pod::<bool>()
     }
 
     pub fn pop_id(&mut self) -> Result<Id, Error> {
-        self.pop_pod::<_, Id>()
+        self.pop_pod::<Id>()
     }
 
     pub fn pop_int(&mut self) -> Result<i32, Error> {
-        self.pop_pod::<_, i32>()
+        self.pop_pod::<i32>()
     }
 
     pub fn pop_long(&mut self) -> Result<i64, Error> {
-        self.pop_pod::<_, i64>()
+        self.pop_pod::<i64>()
     }
 
     pub fn pop_float(&mut self) -> Result<f32, Error> {
-        self.pop_pod::<_, f32>()
+        self.pop_pod::<f32>()
     }
 
     pub fn pop_double(&mut self) -> Result<f64, Error> {
-        self.pop_pod::<_, f64>()
+        self.pop_pod::<f64>()
     }
 
     pub fn pop_string(&mut self) -> Result<String, Error> {
-        self.pop_pod::<_, &str>()
+        self.pop_pod::<&str>()
     }
 
     pub fn pop_bytes(&mut self) -> Result<Vec<u8>, Error> {
-        self.pop_pod::<_, &[u8]>()
+        self.pop_pod::<&[u8]>()
     }
 
     pub fn pop_pointer(&mut self) -> Result<Pointer, Error> {
-        self.pop_pod::<_, Pointer>()
+        self.pop_pod::<Pointer>()
     }
 
     pub fn pop_fd(&mut self) -> Result<Fd, Error> {
-        self.pop_pod::<_, Fd>()
+        self.pop_pod::<Fd>()
     }
 
     pub fn pop_rectangle(&mut self) -> Result<Rectangle, Error> {
-        self.pop_pod::<_, Rectangle>()
+        self.pop_pod::<Rectangle>()
     }
 
     pub fn pop_fraction(&mut self) -> Result<Fraction, Error> {
-        self.pop_pod::<_, Fraction>()
+        self.pop_pod::<Fraction>()
     }
 }

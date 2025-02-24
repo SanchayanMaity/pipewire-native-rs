@@ -16,10 +16,12 @@ use error::Error;
 use internal::primitive_pod_size;
 use types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
 
-// T is the type we decode to (which might need to be the owned version for things like slices)
-pub trait Pod<T> {
+pub trait Pod {
+    // Default to Self once that is stable, or try to generate references to owned data
+    type DecodesTo;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error>;
-    fn decode(data: &[u8]) -> Result<(T, usize), Error>;
+    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error>;
 }
 
 fn write_header_fixed(data: &mut [u8], t: Type) -> Result<usize, Error> {
@@ -48,7 +50,9 @@ fn decode_header_fixed(data: &[u8], t: Type) -> Result<usize, Error> {
     }
 }
 
-impl Pod<()> for () {
+impl Pod for () {
+    type DecodesTo = ();
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         write_header_fixed(data, Type::None)
     }
@@ -58,7 +62,9 @@ impl Pod<()> for () {
     }
 }
 
-impl Pod<bool> for bool {
+impl Pod for bool {
+    type DecodesTo = bool;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Bool)?;
 
@@ -75,7 +81,9 @@ impl Pod<bool> for bool {
     }
 }
 
-impl Pod<Id> for Id {
+impl Pod for Id {
+    type DecodesTo = Id;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Id)?;
 
@@ -92,7 +100,9 @@ impl Pod<Id> for Id {
     }
 }
 
-impl Pod<i32> for i32 {
+impl Pod for i32 {
+    type DecodesTo = i32;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Int)?;
 
@@ -110,7 +120,9 @@ impl Pod<i32> for i32 {
     }
 }
 
-impl Pod<i64> for i64 {
+impl Pod for i64 {
+    type DecodesTo = i64;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Long)?;
 
@@ -127,7 +139,9 @@ impl Pod<i64> for i64 {
     }
 }
 
-impl Pod<f32> for f32 {
+impl Pod for f32 {
+    type DecodesTo = f32;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Float)?;
 
@@ -145,7 +159,9 @@ impl Pod<f32> for f32 {
     }
 }
 
-impl Pod<f64> for f64 {
+impl Pod for f64 {
+    type DecodesTo = f64;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Double)?;
 
@@ -162,7 +178,9 @@ impl Pod<f64> for f64 {
     }
 }
 
-impl Pod<String> for &str {
+impl Pod for &str {
+    type DecodesTo = String;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let len = self.len() + 1;
         let padding = 8 - len % 8;
@@ -204,7 +222,9 @@ impl Pod<String> for &str {
     }
 }
 
-impl Pod<Vec<u8>> for &[u8] {
+impl Pod for &[u8] {
+    type DecodesTo = Vec<u8>;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let len = self.len();
         let padding = 8 - len % 8;
@@ -238,7 +258,9 @@ impl Pod<Vec<u8>> for &[u8] {
     }
 }
 
-impl Pod<Pointer> for Pointer {
+impl Pod for Pointer {
+    type DecodesTo = Pointer;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let ptr_size = std::mem::size_of::<*const c_void>();
         let size = 4 /* type */ + 4 /* _padding */ + ptr_size /* pointer */;
@@ -288,7 +310,9 @@ impl Pod<Pointer> for Pointer {
     }
 }
 
-impl Pod<Fd> for Fd {
+impl Pod for Fd {
+    type DecodesTo = Fd;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Fd)?;
 
@@ -305,7 +329,9 @@ impl Pod<Fd> for Fd {
     }
 }
 
-impl Pod<Rectangle> for Rectangle {
+impl Pod for Rectangle {
+    type DecodesTo = Rectangle;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Rectangle)?;
 
@@ -324,7 +350,9 @@ impl Pod<Rectangle> for Rectangle {
     }
 }
 
-impl Pod<Fraction> for Fraction {
+impl Pod for Fraction {
+    type DecodesTo = Fraction;
+
     fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
         let size = write_header_fixed(data, Type::Fraction)?;
 
