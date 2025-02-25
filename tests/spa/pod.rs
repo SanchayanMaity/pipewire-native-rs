@@ -6,7 +6,7 @@ use std::ffi::c_void;
 
 use pipewire_native::spa::pod::builder::Builder;
 use pipewire_native::spa::pod::parser::Parser;
-use pipewire_native::spa::pod::types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
+use pipewire_native::spa::pod::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
 use pipewire_native::spa::pod::Pod;
 
 use libspa::pod as spa_pod;
@@ -33,6 +33,22 @@ fn test_pod_builder() {
         .push_fraction(30001, 1)
         .push_array(&[11.0f32, 12.0, 13.0])
         .push_array::<bool>(&[])
+        .push_choice(Choice::None(14i64))
+        .push_choice(Choice::Range {
+            default: 1i32,
+            min: 0,
+            max: 10,
+        })
+        .push_choice(Choice::Step {
+            default: 1.5f32,
+            min: 0.0,
+            max: 10.0,
+            step: 0.25,
+        })
+        .push_choice(Choice::Enum {
+            default: Id(2),
+            alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
+        })
         .build()
         .unwrap();
 
@@ -83,11 +99,56 @@ fn test_pod_builder() {
             .add_array(4, spa_sys::SPA_TYPE_Bool, 0, [].as_ptr() as *const c_void)
             .unwrap();
     }
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder
+            .push_choice(&mut frame, spa_sys::SPA_CHOICE_None, 0)
+            .unwrap();
+        sbuilder.add_long(14i64).unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder
+            .push_choice(&mut frame, spa_sys::SPA_CHOICE_Range, 0)
+            .unwrap();
+        sbuilder.add_int(1).unwrap();
+        sbuilder.add_int(0).unwrap();
+        sbuilder.add_int(10).unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder
+            .push_choice(&mut frame, spa_sys::SPA_CHOICE_Step, 0)
+            .unwrap();
+        sbuilder.add_float(1.5).unwrap();
+        sbuilder.add_float(0.0).unwrap();
+        sbuilder.add_float(10.0).unwrap();
+        sbuilder.add_float(0.25).unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder
+            .push_choice(&mut frame, spa_sys::SPA_CHOICE_Enum, 0)
+            .unwrap();
+        sbuilder.add_id(spa_utils::Id(2)).unwrap();
+        sbuilder.add_id(spa_utils::Id(1)).unwrap();
+        sbuilder.add_id(spa_utils::Id(2)).unwrap();
+        sbuilder.add_id(spa_utils::Id(3)).unwrap();
+        sbuilder.add_id(spa_utils::Id(4)).unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
 
     assert_eq!(res, sbuf.as_slice());
 }
 
-fn test_a_pod<T: Copy + Pod>(pod: &T)
+fn test_a_pod<T: Clone + Pod>(pod: &T)
 where
     <T as Pod>::DecodesTo: From<T> + std::cmp::PartialEq + std::fmt::Debug,
 {
@@ -97,7 +158,7 @@ where
     let (rv, rsize) = T::decode(&buf).unwrap();
 
     assert_eq!(size, rsize);
-    assert_eq!(<T as Pod>::DecodesTo::from(*pod), rv);
+    assert_eq!(<T as Pod>::DecodesTo::from(pod.clone()), rv);
 }
 
 #[test]
@@ -122,6 +183,22 @@ fn test_pod_decode() {
         denom: 1,
     });
     test_a_pod(&vec![11.0f32, 12.0, 13.0].as_slice());
+    test_a_pod(&Choice::None(14i64));
+    test_a_pod(&Choice::Range {
+        default: 1i32,
+        min: 0,
+        max: 10,
+    });
+    test_a_pod(&Choice::Step {
+        default: 1.5f32,
+        min: 0.0,
+        max: 10.0,
+        step: 0.25,
+    });
+    test_a_pod(&Choice::Enum {
+        default: Id(2),
+        alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
+    });
 }
 
 #[test]
@@ -143,6 +220,22 @@ fn test_pod_parser() {
         .push_rectangle(1920, 1080)
         .push_fraction(30001, 1)
         .push_array(&[11.0f32, 12.0, 13.0])
+        .push_choice(Choice::None(14i64))
+        .push_choice(Choice::Range {
+            default: 1i32,
+            min: 0,
+            max: 10,
+        })
+        .push_choice(Choice::Step {
+            default: 1.5f32,
+            min: 0.0,
+            max: 10.0,
+            step: 0.25,
+        })
+        .push_choice(Choice::Enum {
+            default: Id(2),
+            alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
+        })
         .build()
         .unwrap();
 
@@ -181,5 +274,30 @@ fn test_pod_parser() {
     assert_eq!(
         parser.pop_array::<f32>().unwrap(),
         vec![11.0f32, 12.0, 13.0]
+    );
+    assert_eq!(parser.pop_choice::<i64>().unwrap(), Choice::None(14i64));
+    assert_eq!(
+        parser.pop_choice::<i32>().unwrap(),
+        Choice::Range {
+            default: 1i32,
+            min: 0,
+            max: 10,
+        }
+    );
+    assert_eq!(
+        parser.pop_choice::<f32>().unwrap(),
+        Choice::Step {
+            default: 1.5f32,
+            min: 0.0,
+            max: 10.0,
+            step: 0.25,
+        }
+    );
+    assert_eq!(
+        parser.pop_choice::<Id>().unwrap(),
+        Choice::Enum {
+            default: Id(2),
+            alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
+        }
     );
 }

@@ -11,7 +11,7 @@ use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 use error::Error;
-use types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
+use types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
 
 pub trait Pod {
     // Default to Self once that is stable, or try to generate references to owned data
@@ -451,7 +451,7 @@ impl Pod for Pointer {
 // |  child type  | 4 bytes
 // +--------------+
 // |  elem data   |
-// |    bodies    | 4 bytes
+// |    bodies    |
 // +--------------+
 // |   padding?   | 4 bytes
 // +--------------+
@@ -513,5 +513,196 @@ where
         }
 
         Ok((res, 8 + size + padding))
+    }
+}
+
+// Choice is encoded as:
+//
+// +--------------+
+// |  total size* | 4 bytes
+// +--------------+
+// |   pod type   | 4 bytes
+// +--------------+
+// | choice type  | 4 bytes
+// +--------------+
+// |    flags     | 4 bytes
+// +--------------+
+// |  child size  | 4 bytes
+// +--------------+
+// |  child type  | 4 bytes
+// +--------------+
+// |  elem data   |
+// |    bodies    |
+// +--------------+
+// |   padding?   | 4 bytes
+// +--------------+
+//
+impl<T> Pod for Choice<T>
+where
+    T: Pod + Primitive,
+{
+    type DecodesTo = Choice<T>;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        let child_size = T::pod_size();
+        let size = 16
+            + match self {
+                Choice::None(_) => child_size,
+                Choice::Range { .. } => child_size * 3,
+                Choice::Step { .. } => child_size * 4,
+                Choice::Enum {
+                    default: _,
+                    alternatives,
+                } => child_size * (1 + alternatives.len()),
+                Choice::Flags { .. } => child_size * 2,
+            };
+        let padding = pad_8(size);
+
+        if data.len() < 24 + size + padding {
+            return Err(Error::NoSpace);
+        }
+
+        let choice_type = match self {
+            Choice::None(_) => 0u32,
+            Choice::Range { .. } => 1,
+            Choice::Step { .. } => 2,
+            Choice::Enum { .. } => 3,
+            Choice::Flags { .. } => 4,
+        };
+
+        data[0..4].copy_from_slice(&(size as u32).to_ne_bytes());
+        data[4..8].copy_from_slice(&(Type::Choice as u32).to_ne_bytes());
+        data[8..12].copy_from_slice(&choice_type.to_ne_bytes());
+        // flags is unused, so we don't bother exposing it
+        data[12..16].copy_from_slice(&0u32.to_ne_bytes());
+        data[16..20].copy_from_slice(&(T::pod_size() as u32).to_ne_bytes());
+        data[20..24].copy_from_slice(&(T::pod_type() as u32).to_ne_bytes());
+
+        match self {
+            Choice::None(value) => {
+                value.encode_body(&mut data[24..])?;
+            }
+            Choice::Range { default, min, max } => {
+                default.encode_body(&mut data[24..])?;
+                min.encode_body(&mut data[24 + child_size..])?;
+                max.encode_body(&mut data[24 + child_size * 2..])?;
+            }
+            Choice::Step {
+                default,
+                min,
+                max,
+                step,
+            } => {
+                default.encode_body(&mut data[24..])?;
+                min.encode_body(&mut data[24 + child_size..])?;
+                max.encode_body(&mut data[24 + child_size * 2..])?;
+                step.encode_body(&mut data[24 + child_size * 3..])?;
+            }
+            Choice::Enum {
+                default,
+                alternatives,
+            } => {
+                default.encode_body(&mut data[24..])?;
+                for (i, alt) in alternatives.iter().enumerate() {
+                    alt.encode_body(&mut data[24 + child_size * (i + 1)..])?;
+                }
+            }
+            Choice::Flags { default, flags } => {
+                default.encode_body(&mut data[24..])?;
+                flags.encode_body(&mut data[24 + child_size..])?;
+            }
+        }
+
+        Ok(8 + size + padding)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Choice<T>, usize), Error> {
+        if data.len() < 24 {
+            return Err(Error::Invalid);
+        }
+
+        let size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
+        let padding = pad_8(size);
+
+        if data.len() < 8 + size + padding {
+            return Err(Error::Invalid);
+        }
+
+        if u32::from_ne_bytes(data[4..8].try_into().unwrap()) != Type::Choice as u32 {
+            return Err(Error::Invalid);
+        }
+
+        let choice_type = u32::from_ne_bytes(data[8..12].try_into().unwrap());
+        // flags is unused, so we don't decode it at [12..16]
+        let child_size = u32::from_ne_bytes(data[16..20].try_into().unwrap()) as usize;
+        println!("{size} {child_size} {choice_type}");
+        if child_size != T::pod_size() {
+            return Err(Error::Invalid);
+        }
+        let child_type = u32::from_ne_bytes(data[20..24].try_into().unwrap());
+        if child_type != T::pod_type() as u32 {
+            return Err(Error::Invalid);
+        }
+
+        let choice = match choice_type {
+            0 => {
+                let value = T::decode_body(&data[24..])?;
+                Choice::None(value)
+            }
+            1 => {
+                if size != 16 + child_size * 3 {
+                    return Err(Error::Invalid);
+                }
+
+                let default = T::decode_body(&data[24..])?;
+                let min = T::decode_body(&data[24 + child_size..])?;
+                let max = T::decode_body(&data[24 + child_size * 2..])?;
+
+                Choice::Range { default, min, max }
+            }
+            2 => {
+                if size != 16 + child_size * 4 {
+                    return Err(Error::Invalid);
+                }
+
+                let default = T::decode_body(&data[24..])?;
+                let min = T::decode_body(&data[24 + child_size..])?;
+                let max = T::decode_body(&data[24 + child_size * 2..])?;
+                let step = T::decode_body(&data[24 + child_size * 3..])?;
+
+                Choice::Step {
+                    default,
+                    min,
+                    max,
+                    step,
+                }
+            }
+            3 => {
+                let default = T::decode_body(&data[24..])?;
+                let mut alternatives = Vec::new();
+
+                for i in 1..(size - 16) / child_size {
+                    alternatives.push(T::decode_body(&data[24 + child_size * i..])?);
+                }
+
+                Choice::Enum {
+                    default,
+                    alternatives,
+                }
+            }
+            4 => {
+                if size != 16 + child_size * 2 {
+                    return Err(Error::Invalid);
+                }
+
+                let default = T::decode_body(&data[24..])?;
+                let flags = T::decode_body(&data[24 + child_size..])?;
+
+                Choice::Flags { default, flags }
+            }
+            _ => return Err(Error::Invalid),
+        };
+
+        Ok((choice, 8 + size + padding))
     }
 }

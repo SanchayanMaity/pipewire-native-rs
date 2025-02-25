@@ -87,3 +87,19 @@ pub struct Fraction {
     pub num: u32,
     pub denom: u32,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Choice<T> {
+    None(T),
+    Range { default: T, min: T, max: T },
+    Step { default: T, min: T, max: T, step: T },
+    Enum { default: T, alternatives: Vec<T> },
+    Flags { default: T, flags: T },
+}
+
+pub mod choice {
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub enum Flags {
+        None = 0,
+    }
+}

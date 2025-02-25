@@ -6,7 +6,7 @@ use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 use super::error::Error;
-use super::types::{Fd, Fraction, Id, Pointer, Rectangle, Type};
+use super::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
 use super::{Pod, Primitive};
 
 pub struct Builder<'a> {
@@ -103,5 +103,12 @@ impl<'a> Builder<'a> {
         T: Pod + Primitive,
     {
         self.push_pod(values)
+    }
+
+    pub fn push_choice<T>(self, value: Choice<T>) -> Self
+    where
+        T: Pod + Primitive,
+    {
+        self.push_pod(value)
     }
 }

@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use super::error::Error;
-use super::types::{Fd, Fraction, Id, Pointer, Rectangle};
+use super::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle};
 use super::{Pod, Primitive};
 
 pub struct Parser<'a> {
@@ -81,5 +81,12 @@ impl<'a> Parser<'a> {
         T: Pod + Primitive,
     {
         self.pop_pod::<&[T]>()
+    }
+
+    pub fn pop_choice<T>(&mut self) -> Result<Choice<T>, Error>
+    where
+        T: Pod + Primitive,
+    {
+        self.pop_pod::<Choice<T>>()
     }
 }
