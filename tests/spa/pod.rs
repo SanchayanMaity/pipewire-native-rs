@@ -145,7 +145,7 @@ fn test_pod_builder() {
         sbuilder.pop(&mut frame.assume_init());
     };
 
-    assert_eq!(res, sbuf.as_slice());
+    assert_eq!(res.data, sbuf.as_slice());
 }
 
 fn test_a_pod<T: Clone + Pod>(pod: &T)
@@ -239,7 +239,7 @@ fn test_pod_parser() {
         .build()
         .unwrap();
 
-    let mut parser = Parser::new(&res);
+    let mut parser = Parser::new(&res.data);
     assert_eq!(parser.pop_none().unwrap(), ());
     assert_eq!(parser.pop_bool().unwrap(), true);
     assert_eq!(parser.pop_id().unwrap(), Id(1));

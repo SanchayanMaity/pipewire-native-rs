@@ -7,7 +7,7 @@ use std::os::fd::RawFd;
 
 use super::error::Error;
 use super::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
-use super::{Pod, Primitive};
+use super::{Pod, Primitive, RawPod};
 
 pub struct Builder<'a> {
     data: &'a mut [u8],
@@ -24,11 +24,13 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub fn build(self) -> Result<&'a [u8], Error> {
+    pub fn build(self) -> Result<RawPod<'a>, Error> {
         if let Some(e) = self.error {
             Err(e)
         } else {
-            Ok(&self.data[0..self.pos])
+            Ok(RawPod {
+                data: &self.data[0..self.pos],
+            })
         }
     }
 
