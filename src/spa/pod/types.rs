@@ -96,10 +96,3 @@ pub enum Choice<T> {
     Enum { default: T, alternatives: Vec<T> },
     Flags { default: T, flags: T },
 }
-
-pub mod choice {
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub enum Flags {
-        None = 0,
-    }
-}
