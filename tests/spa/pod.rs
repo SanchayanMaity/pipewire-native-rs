@@ -301,3 +301,79 @@ fn test_pod_parser() {
         }
     );
 }
+
+#[test]
+fn test_pod_builder_struct_empty() {
+    let mut buf = [0u8; 1024];
+
+    let builder = Builder::new(&mut buf);
+    let res = builder.push_struct(|b| b).build().unwrap();
+
+    let mut sbuf = Vec::with_capacity(1024);
+    let mut sbuilder = spa_pod::builder::Builder::new(&mut sbuf);
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder.push_struct(&mut frame).unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
+    assert_eq!(res.data, sbuf.as_slice());
+
+    let mut parser = Parser::new(&buf);
+    assert_eq!(parser.pop_struct(|_| Ok(())).unwrap(), ());
+}
+
+#[test]
+fn test_pod_builder_struct() {
+    let mut buf = [0u8; 1024];
+
+    let builder = Builder::new(&mut buf);
+    let res = builder
+        .push_struct(|b| {
+            b.push_id(Id(1))
+                .push_long(2)
+                .push_rectangle(3840, 2160)
+                .push_float(3.0)
+        })
+        .build()
+        .unwrap();
+
+    let mut sbuf = Vec::with_capacity(1024);
+    let mut sbuilder = spa_pod::builder::Builder::new(&mut sbuf);
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder.push_struct(&mut frame).unwrap();
+        sbuilder.add_id(spa_utils::Id(1)).unwrap();
+        sbuilder.add_long(2).unwrap();
+        sbuilder
+            .add_rectangle(spa_utils::Rectangle {
+                width: 3840,
+                height: 2160,
+            })
+            .unwrap();
+        sbuilder.add_float(3.0).unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
+    assert_eq!(res.data, sbuf.as_slice());
+
+    let mut parser = Parser::new(&buf);
+    assert_eq!(
+        parser
+            .pop_struct(|p| {
+                assert_eq!(p.pop_id().unwrap(), Id(1));
+                assert_eq!(p.pop_long().unwrap(), 2);
+                assert_eq!(
+                    p.pop_rectangle().unwrap(),
+                    Rectangle {
+                        width: 3840,
+                        height: 2160
+                    }
+                );
+                assert_eq!(p.pop_float().unwrap(), 3.0);
+                Ok(())
+            })
+            .unwrap(),
+        ()
+    );
+}

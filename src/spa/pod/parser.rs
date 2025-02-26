@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use super::error::Error;
-use super::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle};
+use super::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
 use super::{Pod, Primitive};
 
 pub struct Parser<'a> {
@@ -88,5 +88,32 @@ impl<'a> Parser<'a> {
         T: Pod + Primitive,
     {
         self.pop_pod::<Choice<T>>()
+    }
+
+    pub fn pop_struct<F>(&mut self, parse_struct: F) -> Result<(), Error>
+    where
+        F: FnOnce(&mut Parser) -> Result<(), Error>,
+    {
+        if self.data.len() < 8 {
+            return Err(Error::Invalid);
+        }
+
+        let size =
+            u32::from_ne_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap()) as usize;
+        if self.data.len() < 8 + size {
+            return Err(Error::Invalid);
+        }
+
+        let t = u32::from_ne_bytes(self.data[self.pos + 4..self.pos + 8].try_into().unwrap());
+        if t != Type::Struct as u32 {
+            return Err(Error::Invalid);
+        }
+
+        let mut struct_parser = Parser::new(&self.data[self.pos + 8..self.pos + 8 + size]);
+        parse_struct(&mut struct_parser)?;
+
+        self.pos += struct_parser.pos;
+
+        Ok(())
     }
 }

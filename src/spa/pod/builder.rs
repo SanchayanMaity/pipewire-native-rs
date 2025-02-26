@@ -113,4 +113,35 @@ impl<'a> Builder<'a> {
     {
         self.push_pod(value)
     }
+
+    pub fn push_struct<F>(mut self, build_struct: F) -> Self
+    where
+        F: FnOnce(Builder) -> Builder,
+    {
+        if self.error.is_some() {
+            return self;
+        }
+
+        if self.data.len() < 8 {
+            self.error = Some(Error::NoSpace);
+            return self;
+        }
+
+        let size = {
+            let struct_builder = Builder::new(&mut self.data[self.pos + 8..]);
+            match build_struct(struct_builder).build() {
+                Ok(pod) => pod.data.len(),
+                Err(e) => {
+                    self.error = Some(e);
+                    return self;
+                }
+            }
+        };
+
+        self.data[self.pos..self.pos + 4].copy_from_slice(&(size as u32).to_ne_bytes());
+        self.data[self.pos + 4..self.pos + 8].copy_from_slice(&(Type::Struct as u32).to_ne_bytes());
+
+        self.pos += 8 + size;
+        self
+    }
 }
