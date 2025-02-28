@@ -20,7 +20,7 @@ fn test_pod_builder() {
     let res = builder
         .push_none()
         .push_bool(true)
-        .push_id(Id(1))
+        .push_id(Id(1u32))
         .push_int(2)
         .push_long(3)
         .push_float(4.0)
@@ -46,7 +46,7 @@ fn test_pod_builder() {
             step: 0.25,
         })
         .push_choice(Choice::Enum {
-            default: Id(2),
+            default: Id(2u32),
             alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
         })
         .build()
@@ -196,7 +196,7 @@ fn test_pod_decode() {
         step: 0.25,
     });
     test_a_pod(&Choice::Enum {
-        default: Id(2),
+        default: Id(2u32),
         alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
     });
 }
@@ -208,7 +208,7 @@ fn test_pod_parser() {
     let res = builder
         .push_none()
         .push_bool(true)
-        .push_id(Id(1))
+        .push_id(Id(1u32))
         .push_int(2)
         .push_long(3)
         .push_float(4.0)
@@ -233,7 +233,7 @@ fn test_pod_parser() {
             step: 0.25,
         })
         .push_choice(Choice::Enum {
-            default: Id(2),
+            default: Id(2u32),
             alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
         })
         .build()
@@ -242,7 +242,7 @@ fn test_pod_parser() {
     let mut parser = Parser::new(&res);
     assert_eq!(parser.pop_none().unwrap(), ());
     assert_eq!(parser.pop_bool().unwrap(), true);
-    assert_eq!(parser.pop_id().unwrap(), Id(1));
+    assert_eq!(parser.pop_id().unwrap(), Id(1u32));
     assert_eq!(parser.pop_int().unwrap(), 2);
     assert_eq!(parser.pop_long().unwrap(), 3);
     assert_eq!(parser.pop_float().unwrap(), 4.0);
@@ -294,7 +294,7 @@ fn test_pod_parser() {
         }
     );
     assert_eq!(
-        parser.pop_choice::<Id>().unwrap(),
+        parser.pop_choice::<Id<u32>>().unwrap(),
         Choice::Enum {
             default: Id(2),
             alternatives: [Id(1), Id(2), Id(3), Id(4)].to_vec(),
@@ -330,7 +330,7 @@ fn test_pod_builder_struct() {
     let builder = Builder::new(&mut buf);
     let res = builder
         .push_struct(|b| {
-            b.push_id(Id(1))
+            b.push_id(Id(1u32))
                 .push_long(2)
                 .push_rectangle(3840, 2160)
                 .push_float(3.0)
@@ -361,7 +361,7 @@ fn test_pod_builder_struct() {
     assert_eq!(
         parser
             .pop_struct(|p| {
-                assert_eq!(p.pop_id().unwrap(), Id(1));
+                assert_eq!(p.pop_id().unwrap(), Id(1u32));
                 assert_eq!(p.pop_long().unwrap(), 2);
                 assert_eq!(
                     p.pop_rectangle().unwrap(),

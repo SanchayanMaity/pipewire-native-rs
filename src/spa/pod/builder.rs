@@ -51,7 +51,10 @@ impl<'a> Builder<'a> {
         self.push_pod(value)
     }
 
-    pub fn push_id(self, value: Id) -> Self {
+    pub fn push_id<T>(self, value: Id<T>) -> Self
+    where
+        T: Into<u32> + TryFrom<u32> + Copy,
+    {
         self.push_pod(value)
     }
 

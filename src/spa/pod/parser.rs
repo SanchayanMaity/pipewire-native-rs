@@ -32,8 +32,11 @@ impl<'a> Parser<'a> {
         self.pop_pod::<bool>()
     }
 
-    pub fn pop_id(&mut self) -> Result<Id, Error> {
-        self.pop_pod::<Id>()
+    pub fn pop_id<T>(&mut self) -> Result<Id<T>, Error>
+    where
+        T: Into<u32> + TryFrom<u32> + Copy,
+    {
+        self.pop_pod::<Id<T>>()
     }
 
     pub fn pop_int(&mut self) -> Result<i32, Error> {

@@ -64,7 +64,7 @@ impl TryFrom<u32> for Type {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Id(pub u32);
+pub struct Id<T>(pub T);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Pointer {

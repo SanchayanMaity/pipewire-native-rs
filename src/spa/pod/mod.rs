@@ -124,7 +124,10 @@ impl Primitive for bool {
     }
 }
 
-impl Primitive for Id {
+impl<T> Primitive for Id<T>
+where
+    T: Into<u32> + TryFrom<u32> + Copy,
+{
     fn pod_type() -> Type {
         Type::Id
     }
@@ -134,13 +137,17 @@ impl Primitive for Id {
     }
 
     fn encode_body(&self, data: &mut [u8]) -> Result<(), Error> {
-        data[0..4].copy_from_slice(&self.0.to_ne_bytes());
+        data[0..4].copy_from_slice(&self.0.into().to_ne_bytes());
         Ok(())
     }
 
     fn decode_body(data: &[u8]) -> Result<Self, Error> {
-        let val = u32::from_ne_bytes(data[0..4].try_into().unwrap());
-        Ok(Id(val))
+        let raw_val = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+        if let Ok(val) = raw_val.try_into() {
+            Ok(Id(val))
+        } else {
+            Err(Error::Invalid)
+        }
     }
 }
 
