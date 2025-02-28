@@ -31,11 +31,6 @@ pub trait Primitive {
         Self: Sized;
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RawPod<'a> {
-    pub data: &'a [u8],
-}
-
 fn pad_8(size: usize) -> usize {
     if size % 8 > 0 {
         8 - size % 8
