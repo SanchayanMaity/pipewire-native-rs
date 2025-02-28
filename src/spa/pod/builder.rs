@@ -115,6 +115,18 @@ impl<'a> Builder<'a> {
         self.push_pod(value)
     }
 
+    // Struct is encoded as
+    //
+    // +--------------+
+    // |  total size  | 4 bytes
+    // +--------------+
+    // |   pod type   | 4 bytes
+    // +--------------+
+    // |              |
+    // | member pods  | size bytes
+    // |              |
+    // +--------------+
+    //
     pub fn push_struct<F>(mut self, build_struct: F) -> Self
     where
         F: FnOnce(Builder) -> Builder,
