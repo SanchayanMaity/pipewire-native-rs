@@ -131,7 +131,7 @@ impl<'a> Builder<'a> {
     //
     pub fn push_struct<F>(mut self, build_struct: F) -> Self
     where
-        F: FnOnce(Builder) -> Builder,
+        F: FnOnce(StructBuilder) -> StructBuilder,
     {
         if self.error.is_some() {
             return self;
@@ -142,22 +142,21 @@ impl<'a> Builder<'a> {
             return self;
         }
 
-        let size = {
-            let struct_builder = Builder::new(&mut self.data[self.pos + 8..]);
-            match build_struct(struct_builder).build() {
-                Ok(data) => data.len(),
-                Err(e) => {
-                    self.error = Some(e);
-                    return self;
-                }
-            }
-        };
+        let old_pos = self.pos;
+        self.pos += 8;
 
-        self.data[self.pos..self.pos + 4].copy_from_slice(&(size as u32).to_ne_bytes());
-        self.data[self.pos + 4..self.pos + 8].copy_from_slice(&(Type::Struct as u32).to_ne_bytes());
+        let struct_builder = StructBuilder::new(self);
+        let ret = build_struct(struct_builder).builder();
 
-        self.pos += 8 + size;
-        self
+        if ret.error.is_some() {
+            return ret;
+        }
+
+        let size = ret.pos - old_pos - 8;
+        ret.data[old_pos..old_pos + 4].copy_from_slice(&(size as u32).to_ne_bytes());
+        ret.data[old_pos + 4..old_pos + 8].copy_from_slice(&(Type::Struct as u32).to_ne_bytes());
+
+        ret
     }
 
     // Object is encoded as
@@ -224,6 +223,108 @@ impl<'a> Builder<'a> {
         ret.data[old_pos + 12..old_pos + 16].copy_from_slice(&id.into().to_ne_bytes());
 
         ret
+    }
+}
+
+pub struct StructBuilder<'a> {
+    builder: Builder<'a>,
+}
+
+impl<'a> StructBuilder<'a> {
+    fn new(builder: Builder<'a>) -> Self {
+        Self { builder }
+    }
+
+    fn builder(self) -> Builder<'a> {
+        self.builder
+    }
+
+    pub fn push_pod<U: Pod>(self, value: U) -> Self {
+        StructBuilder::new(self.builder.push_pod(value))
+    }
+
+    pub fn push_none(self) -> Self {
+        StructBuilder::new(self.builder.push_none())
+    }
+
+    pub fn push_bool(self, value: bool) -> Self {
+        StructBuilder::new(self.builder.push_bool(value))
+    }
+
+    pub fn push_id<T>(self, value: Id<T>) -> Self
+    where
+        T: Into<u32> + TryFrom<u32> + Copy,
+    {
+        StructBuilder::new(self.builder.push_id(value))
+    }
+
+    pub fn push_int(self, value: i32) -> Self {
+        StructBuilder::new(self.builder.push_int(value))
+    }
+
+    pub fn push_long(self, value: i64) -> Self {
+        StructBuilder::new(self.builder.push_long(value))
+    }
+
+    pub fn push_float(self, value: f32) -> Self {
+        StructBuilder::new(self.builder.push_float(value))
+    }
+
+    pub fn push_double(self, value: f64) -> Self {
+        StructBuilder::new(self.builder.push_double(value))
+    }
+
+    pub fn push_fd(self, value: RawFd) -> Self {
+        StructBuilder::new(self.builder.push_fd(value))
+    }
+
+    pub fn push_rectangle(self, width: u32, height: u32) -> Self {
+        StructBuilder::new(self.builder.push_rectangle(width, height))
+    }
+
+    pub fn push_fraction(self, num: u32, denom: u32) -> Self {
+        StructBuilder::new(self.builder.push_fraction(num, denom))
+    }
+
+    pub fn push_string(self, value: &str) -> Self {
+        StructBuilder::new(self.builder.push_string(value))
+    }
+
+    pub fn push_bytes(self, value: &[u8]) -> Self {
+        StructBuilder::new(self.builder.push_bytes(value))
+    }
+
+    pub fn push_pointer(self, typ: Type, value: *const c_void) -> Self {
+        StructBuilder::new(self.builder.push_pointer(typ, value))
+    }
+
+    pub fn push_array<T>(self, values: &[T]) -> Self
+    where
+        T: Pod + Primitive,
+    {
+        StructBuilder::new(self.builder.push_array(values))
+    }
+
+    pub fn push_choice<T>(self, value: Choice<T>) -> Self
+    where
+        T: Pod + Primitive,
+    {
+        StructBuilder::new(self.builder.push_choice(value))
+    }
+
+    pub fn push_struct<F>(self, build_struct: F) -> Self
+    where
+        F: FnOnce(StructBuilder) -> StructBuilder,
+    {
+        StructBuilder::new(self.builder.push_struct(build_struct))
+    }
+
+    pub fn push_object<T, F>(self, type_: ObjectType, id: T, build_object: F) -> Self
+    where
+        T: Into<u32> + TryFrom<u32>,
+        F: FnOnce(ObjectBuilder) -> ObjectBuilder,
+    {
+        StructBuilder::new(self.builder.push_object(type_, id, build_object))
     }
 }
 
