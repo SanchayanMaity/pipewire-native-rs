@@ -6,10 +6,11 @@ use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 use bitflags::bitflags;
+use pipewire_native_macros::EnumU32;
 
 // spa/utils/type.h: Basic SPA_TYPE_*
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
 pub enum Type {
     Start = 0,
     None,
@@ -34,39 +35,8 @@ pub enum Type {
     Pod,
 }
 
-impl TryFrom<u32> for Type {
-    type Error = ();
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::Start),
-            1 => Ok(Self::None),
-            2 => Ok(Self::Bool),
-            3 => Ok(Self::Id),
-            4 => Ok(Self::Int),
-            5 => Ok(Self::Long),
-            6 => Ok(Self::Float),
-            7 => Ok(Self::Double),
-            8 => Ok(Self::String),
-            9 => Ok(Self::Bytes),
-            10 => Ok(Self::Rectangle),
-            11 => Ok(Self::Fraction),
-            12 => Ok(Self::Bitmap),
-            13 => Ok(Self::Array),
-            14 => Ok(Self::Struct),
-            15 => Ok(Self::Object),
-            16 => Ok(Self::Sequence),
-            17 => Ok(Self::Pointer),
-            18 => Ok(Self::Fd),
-            19 => Ok(Self::Choice),
-            20 => Ok(Self::Pod),
-            _ => Err(()),
-        }
-    }
-}
-
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
 pub enum ObjectType {
     Start = 0x40000,
     PropInfo,
@@ -82,30 +52,6 @@ pub enum ObjectType {
     ParamLatency,
     ParamProcessLatency,
     ParamTag,
-}
-
-impl TryFrom<u32> for ObjectType {
-    type Error = ();
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            0x40000 => Ok(Self::Start),
-            0x40001 => Ok(Self::PropInfo),
-            0x40002 => Ok(Self::Props),
-            0x40003 => Ok(Self::Format),
-            0x40004 => Ok(Self::ParamBuffers),
-            0x40005 => Ok(Self::ParamMeta),
-            0x40006 => Ok(Self::ParamIO),
-            0x40007 => Ok(Self::ParamProfile),
-            0x40008 => Ok(Self::ParamPortConfig),
-            0x40009 => Ok(Self::ParamRoute),
-            0x40010 => Ok(Self::Profiler),
-            0x40011 => Ok(Self::ParamLatency),
-            0x40012 => Ok(Self::ParamProcessLatency),
-            0x40013 => Ok(Self::ParamTag),
-            _ => Err(()),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

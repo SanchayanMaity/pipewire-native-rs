@@ -371,6 +371,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "libspa",
+ "pipewire-native-macros",
 ]
 
 [[package]]

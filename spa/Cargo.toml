@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+pipewire-native-macros = { path = "../macros" }
 bitflags = "2.8.0"
 
 [dev-dependencies]
