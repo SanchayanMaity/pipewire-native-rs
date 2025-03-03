@@ -210,7 +210,7 @@ impl<'a> Builder<'a> {
 
         // Write out all the props
         let object_builder = build_object(ObjectBuilder::new(self));
-        let ret = object_builder.build();
+        let ret = object_builder.builder();
 
         if ret.error.is_some() {
             return ret;
@@ -236,7 +236,7 @@ impl<'a> ObjectBuilder<'a> {
         Self { builder }
     }
 
-    fn build(self) -> Builder<'a> {
+    fn builder(self) -> Builder<'a> {
         self.builder
     }
 
