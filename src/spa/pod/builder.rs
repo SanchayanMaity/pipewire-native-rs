@@ -6,7 +6,9 @@ use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 use super::error::Error;
-use super::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
+use super::types::{
+    Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
+};
 use super::{Pod, Primitive};
 
 pub struct Builder<'a> {
@@ -155,6 +157,95 @@ impl<'a> Builder<'a> {
         self.data[self.pos + 4..self.pos + 8].copy_from_slice(&(Type::Struct as u32).to_ne_bytes());
 
         self.pos += 8 + size;
+        self
+    }
+
+    // Object is encoded as
+    //
+    // +--------------+
+    // |  total size  | 4 bytes
+    // +--------------+
+    // |   pod type   | 4 bytes
+    // +--------------+
+    // | object type  | 4 bytes
+    // +--------------+
+    // |  object id   | 4 bytes
+    // +--------------+
+    // |              |
+    // |   member     |
+    // |   props      |
+    // |              |
+    // +--------------+
+    //
+    // where each prop is
+    //
+    // +--------------+
+    // |   key        | 4 bytes
+    // +--------------+
+    // |  flags       | 4 bytes
+    // +--------------+
+    // |              |
+    // |   value      |
+    // |   pod        |
+    // |              |
+    // +--------------+
+    //
+    pub fn push_object<T, F>(mut self, type_: ObjectType, id: T, build_object: F) -> Self
+    where
+        T: Into<u32> + TryFrom<u32>,
+        F: FnOnce(ObjectBuilder) -> ObjectBuilder,
+    {
+        if self.error.is_some() {
+            return self;
+        }
+
+        if self.data.len() < 16 {
+            self.error = Some(Error::NoSpace);
+            return self;
+        }
+
+        // Leave some space for the header
+        let old_pos = self.pos;
+        self.pos += 16;
+
+        // Write out all the props
+        let object_builder = build_object(ObjectBuilder::new(self));
+        let ret = object_builder.build();
+
+        if ret.error.is_some() {
+            return ret;
+        }
+
+        // Fill in the header
+        let size = ret.pos - old_pos - 8;
+        ret.data[old_pos..old_pos + 4].copy_from_slice(&(size as u32).to_ne_bytes());
+        ret.data[old_pos + 4..old_pos + 8].copy_from_slice(&(Type::Object as u32).to_ne_bytes());
+        ret.data[old_pos + 8..old_pos + 12].copy_from_slice(&(type_ as u32).to_ne_bytes());
+        ret.data[old_pos + 12..old_pos + 16].copy_from_slice(&id.into().to_ne_bytes());
+
+        ret
+    }
+}
+
+pub struct ObjectBuilder<'a> {
+    builder: Builder<'a>,
+}
+
+impl<'a> ObjectBuilder<'a> {
+    fn new(builder: Builder<'a>) -> Self {
+        Self { builder }
+    }
+
+    fn build(self) -> Builder<'a> {
+        self.builder
+    }
+
+    pub fn push_property<K, V>(mut self, key: K, flags: PropertyFlags, value: V) -> Self
+    where
+        K: Copy + Into<u32> + TryFrom<u32>,
+        V: Pod,
+    {
+        self.builder = self.builder.push_pod(Property { key, flags, value });
         self
     }
 }

@@ -5,6 +5,8 @@
 use std::ffi::c_void;
 use std::os::fd::RawFd;
 
+use bitflags::bitflags;
+
 // spa/utils/type.h: Basic SPA_TYPE_*
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,6 +65,49 @@ impl TryFrom<u32> for Type {
     }
 }
 
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ObjectType {
+    Start = 0x40000,
+    PropInfo,
+    Props,
+    Format,
+    ParamBuffers,
+    ParamMeta,
+    ParamIO,
+    ParamProfile,
+    ParamPortConfig,
+    ParamRoute,
+    Profiler,
+    ParamLatency,
+    ParamProcessLatency,
+    ParamTag,
+}
+
+impl TryFrom<u32> for ObjectType {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0x40000 => Ok(Self::Start),
+            0x40001 => Ok(Self::PropInfo),
+            0x40002 => Ok(Self::Props),
+            0x40003 => Ok(Self::Format),
+            0x40004 => Ok(Self::ParamBuffers),
+            0x40005 => Ok(Self::ParamMeta),
+            0x40006 => Ok(Self::ParamIO),
+            0x40007 => Ok(Self::ParamProfile),
+            0x40008 => Ok(Self::ParamPortConfig),
+            0x40009 => Ok(Self::ParamRoute),
+            0x40010 => Ok(Self::Profiler),
+            0x40011 => Ok(Self::ParamLatency),
+            0x40012 => Ok(Self::ParamProcessLatency),
+            0x40013 => Ok(Self::ParamTag),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Id<T>(pub T);
 
@@ -95,4 +140,22 @@ pub enum Choice<T> {
     Step { default: T, min: T, max: T, step: T },
     Enum { default: T, alternatives: Vec<T> },
     Flags { default: T, flags: T },
+}
+
+bitflags! {
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct PropertyFlags: u32 {
+        const READ_ONLY = 0x0000_0001;
+        const HARDWARE = 0x0000_0002;
+        const HINT_DICT = 0x0000_0004;
+        const MANDATORY = 0x0000_0008;
+        const DONT_FIXATE = 0x0000_000F;
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct Property<K, V> {
+    pub key: K,
+    pub flags: PropertyFlags,
+    pub value: V,
 }

@@ -11,7 +11,7 @@ use std::ffi::c_void;
 use std::os::fd::RawFd;
 
 use error::Error;
-use types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
+use types::{Choice, Fd, Fraction, Id, Pointer, Property, PropertyFlags, Rectangle, Type};
 
 pub trait Pod {
     // Default to Self once that is stable, or try to generate references to owned data
@@ -711,5 +711,47 @@ where
         };
 
         Ok((choice, 8 + size + padding))
+    }
+}
+
+impl<T, U> Pod for Property<T, U>
+where
+    T: Copy + Into<u32> + TryFrom<u32>,
+    U: Pod,
+{
+    type DecodesTo = Property<T, U::DecodesTo>;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        if data.len() < 8 {
+            return Err(Error::Invalid);
+        }
+
+        data[0..4].copy_from_slice(&self.key.into().to_ne_bytes());
+        data[4..8].copy_from_slice(&self.flags.bits().to_ne_bytes());
+
+        let value_size = self.value.encode(&mut data[8..])?;
+
+        Ok(8 + value_size)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Self::DecodesTo, usize), Error> {
+        if data.len() < 8 {
+            return Err(Error::Invalid);
+        }
+
+        let key = match T::try_from(u32::from_ne_bytes(data[0..4].try_into().unwrap())) {
+            Ok(k) => k,
+            Err(_) => return Err(Error::Invalid),
+        };
+
+        let flags =
+            match PropertyFlags::from_bits(u32::from_ne_bytes(data[4..8].try_into().unwrap())) {
+                Some(f) => f,
+                None => return Err(Error::Invalid),
+            };
+
+        let (value, size) = U::decode(&data[8..])?;
+
+        Ok((Property { key, flags, value }, 8 + size))
     }
 }

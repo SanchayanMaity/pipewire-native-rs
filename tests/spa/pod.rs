@@ -6,11 +6,14 @@ use std::ffi::c_void;
 
 use pipewire_native::spa::pod::builder::Builder;
 use pipewire_native::spa::pod::parser::Parser;
-use pipewire_native::spa::pod::types::{Choice, Fd, Fraction, Id, Pointer, Rectangle, Type};
+use pipewire_native::spa::pod::types::{
+    Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
+};
 use pipewire_native::spa::pod::Pod;
+use pipewire_native::spa::types::params::{ParamType, PropInfo};
 
 use libspa::pod as spa_pod;
-use libspa::sys as spa_sys;
+use libspa::sys::{self as spa_sys};
 use libspa::utils as spa_utils;
 
 #[test]
@@ -371,6 +374,109 @@ fn test_pod_builder_struct() {
                     }
                 );
                 assert_eq!(p.pop_float().unwrap(), 3.0);
+                Ok(())
+            })
+            .unwrap(),
+        ()
+    );
+}
+
+#[test]
+fn test_pod_builder_object_empty() {
+    let mut buf = [0u8; 1024];
+
+    let builder = Builder::new(&mut buf);
+    let res = builder
+        .push_object(ObjectType::PropInfo, ParamType::PropInfo, |b| b)
+        .build()
+        .unwrap();
+
+    let mut sbuf = Vec::with_capacity(1024);
+    let mut sbuilder = spa_pod::builder::Builder::new(&mut sbuf);
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder
+            .push_object(
+                &mut frame,
+                spa_sys::SPA_TYPE_OBJECT_PropInfo,
+                spa_sys::SPA_PARAM_PropInfo,
+            )
+            .unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
+    assert_eq!(res, sbuf.as_slice());
+
+    let mut parser = Parser::new(&buf);
+    assert_eq!(
+        parser
+            .pop_object(|_p, type_, id: ParamType| {
+                assert_eq!(type_, ObjectType::PropInfo);
+                assert_eq!(id, ParamType::PropInfo);
+                Ok(())
+            })
+            .unwrap(),
+        ()
+    );
+}
+
+#[test]
+fn test_pod_builder_object() {
+    let mut buf = [0u8; 1024];
+
+    let builder = Builder::new(&mut buf);
+    let res = builder
+        .push_object(ObjectType::PropInfo, ParamType::PropInfo, |b| {
+            b.push_property(PropInfo::Id, PropertyFlags::empty(), Id(1u32))
+                .push_property(PropInfo::Description, PropertyFlags::empty(), "test")
+        })
+        .build()
+        .unwrap();
+
+    let mut sbuf = Vec::with_capacity(1024);
+    let mut sbuilder = spa_pod::builder::Builder::new(&mut sbuf);
+    unsafe {
+        let mut frame: std::mem::MaybeUninit<spa_sys::spa_pod_frame> =
+            std::mem::MaybeUninit::uninit();
+        sbuilder
+            .push_object(
+                &mut frame,
+                spa_sys::SPA_TYPE_OBJECT_PropInfo,
+                spa_sys::SPA_PARAM_PropInfo,
+            )
+            .unwrap();
+        sbuilder.add_prop(spa_sys::SPA_PROP_INFO_id, 0).unwrap();
+        sbuilder.add_id(spa_utils::Id(1)).unwrap();
+        sbuilder
+            .add_prop(spa_sys::SPA_PROP_INFO_description, 0)
+            .unwrap();
+        sbuilder.add_string("test").unwrap();
+        sbuilder.pop(&mut frame.assume_init());
+    };
+    assert_eq!(res, sbuf.as_slice());
+
+    let mut parser = Parser::new(&buf);
+    assert_eq!(
+        parser
+            .pop_object(|p, type_, id: ParamType| {
+                assert_eq!(type_, ObjectType::PropInfo);
+                assert_eq!(id, ParamType::PropInfo);
+                assert_eq!(
+                    p.pop_property::<PropInfo, Id<u32>>().unwrap(),
+                    Property {
+                        key: PropInfo::Id,
+                        flags: PropertyFlags::empty(),
+                        value: Id(1u32)
+                    }
+                );
+                assert_eq!(
+                    p.pop_property::<PropInfo, &str>().unwrap(),
+                    Property {
+                        key: PropInfo::Description,
+                        flags: PropertyFlags::empty(),
+                        value: "test".to_string()
+                    }
+                );
                 Ok(())
             })
             .unwrap(),
