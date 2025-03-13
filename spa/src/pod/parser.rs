@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use crate::types::params::ParamType;
+
 use super::error::Error;
 use super::types::{
     Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
@@ -122,10 +124,9 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub fn pop_object<F, T>(&'a mut self, parse_object: F) -> Result<(), Error>
+    pub fn pop_object<F>(&'a mut self, parse_object: F) -> Result<(), Error>
     where
-        F: FnOnce(&mut ObjectParser<'a>, ObjectType, T) -> Result<(), Error>,
-        T: Into<u32> + TryFrom<u32>,
+        F: FnOnce(&mut ObjectParser<'a>, ObjectType, ParamType) -> Result<(), Error>,
     {
         if self.data.len() < 16 {
             return Err(Error::Invalid);
@@ -149,7 +150,7 @@ impl<'a> Parser<'a> {
             Err(_) => return Err(Error::Invalid),
         };
 
-        let id = match T::try_from(u32::from_ne_bytes(
+        let id = match ParamType::try_from(u32::from_ne_bytes(
             self.data[self.pos + 12..self.pos + 16].try_into().unwrap(),
         )) {
             Ok(id) => id,

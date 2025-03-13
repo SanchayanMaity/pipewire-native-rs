@@ -5,6 +5,8 @@
 use std::ffi::c_void;
 use std::os::fd::RawFd;
 
+use crate::types::params::ParamType;
+
 use super::error::Error;
 use super::types::{
     Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
@@ -319,9 +321,8 @@ impl<'a> StructBuilder<'a> {
         StructBuilder::new(self.builder.push_struct(build_struct))
     }
 
-    pub fn push_object<T, F>(self, type_: ObjectType, id: T, build_object: F) -> Self
+    pub fn push_object<F>(self, type_: ObjectType, id: ParamType, build_object: F) -> Self
     where
-        T: Into<u32> + TryFrom<u32>,
         F: FnOnce(ObjectBuilder) -> ObjectBuilder,
     {
         StructBuilder::new(self.builder.push_object(type_, id, build_object))
