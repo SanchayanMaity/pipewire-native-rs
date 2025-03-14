@@ -2,13 +2,11 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use crate::types::params::ParamType;
+use crate::types::params::{ParamObject, ParamType};
 
 use super::error::Error;
-use super::types::{
-    Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
-};
-use super::{Pod, Primitive};
+use super::types::{Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type};
+use super::{Pod, PodData, Primitive};
 
 pub struct Parser<'a> {
     data: &'a [u8],
@@ -124,9 +122,12 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub fn pop_object<F>(&'a mut self, parse_object: F) -> Result<(), Error>
+    pub fn pop_object<K>(
+        &'a mut self,
+        parse_object: impl FnOnce(&mut ObjectParser<'_>, ParamType),
+    ) -> Result<(), Error>
     where
-        F: FnOnce(&mut ObjectParser<'a>, ObjectType, ParamType) -> Result<(), Error>,
+        K: ParamObject,
     {
         if self.data.len() < 16 {
             return Err(Error::Invalid);
@@ -150,62 +151,73 @@ impl<'a> Parser<'a> {
             Err(_) => return Err(Error::Invalid),
         };
 
-        let id = match ParamType::try_from(u32::from_ne_bytes(
+        let param_type = match ParamType::try_from(u32::from_ne_bytes(
             self.data[self.pos + 12..self.pos + 16].try_into().unwrap(),
         )) {
             Ok(id) => id,
             Err(_) => return Err(Error::Invalid),
         };
 
-        self.pos += 16;
-        let mut object_parser = ObjectParser::new(self);
+        if object_type != K::TYPE {
+            return Err(Error::Invalid);
+        }
 
-        parse_object(&mut object_parser, object_type, id)?;
+        self.pos += 16;
+
+        {
+            let mut object_parser = ObjectParser::new(&self.data[self.pos..self.pos + size - 8]);
+            parse_object(&mut object_parser, param_type);
+        }
+
+        // The caller may or may not iterate over all properties, don't depend on that
+        self.pos += size - 8;
 
         Ok(())
     }
 }
 
 pub struct ObjectParser<'a> {
-    parser: &'a mut Parser<'a>,
+    data: &'a [u8],
+    pos: usize,
 }
 
 impl<'a> ObjectParser<'a> {
-    fn new(parser: &'a mut Parser<'a>) -> ObjectParser<'a> {
-        ObjectParser { parser }
+    fn new(data: &'a [u8]) -> ObjectParser<'a> {
+        ObjectParser { data, pos: 0 }
     }
 
-    pub fn pop_property<K, V>(&mut self) -> Result<Property<K, <V as Pod>::DecodesTo>, Error>
+    pub fn pop_property<K>(&mut self) -> Result<Option<(K, PropertyFlags, PodData<'a>)>, Error>
     where
-        K: Copy + Into<u32> + TryFrom<u32>,
-        V: Pod,
+        K: TryFrom<u32> + ParamObject,
     {
-        if self.parser.data.len() < 8 {
+        if self.data.len() - self.pos == 0 {
+            return Ok(None);
+        }
+
+        if self.data.len() - self.pos < 16 {
             return Err(Error::Invalid);
         }
 
         let key = match K::try_from(u32::from_ne_bytes(
-            self.parser.data[self.parser.pos..self.parser.pos + 4]
-                .try_into()
-                .unwrap(),
+            self.data[self.pos..self.pos + 4].try_into().unwrap(),
         )) {
             Ok(k) => k,
             Err(_) => return Err(Error::Invalid),
         };
 
         let flags = match PropertyFlags::from_bits(u32::from_ne_bytes(
-            self.parser.data[self.parser.pos + 4..self.parser.pos + 8]
-                .try_into()
-                .unwrap(),
+            self.data[self.pos + 4..self.pos + 8].try_into().unwrap(),
         )) {
             Some(f) => f,
             None => return Err(Error::Invalid),
         };
 
-        self.parser.pos += 8;
+        self.pos += 8;
 
-        let value = self.parser.pop_pod::<V>()?;
+        let data = PodData::wrap(&self.data[self.pos..])?;
 
-        Ok(Property { key, flags, value })
+        self.pos += data.total_size();
+
+        Ok(Some((key, flags, data)))
     }
 }

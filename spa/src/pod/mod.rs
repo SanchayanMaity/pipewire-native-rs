@@ -39,6 +39,51 @@ fn pad_8(size: usize) -> usize {
     }
 }
 
+pub struct PodData<'a> {
+    size: usize,
+    type_: Type,
+    data: &'a [u8],
+}
+
+impl<'a> PodData<'a> {
+    pub fn wrap(data: &'a [u8]) -> Result<PodData<'a>, Error> {
+        if data.len() < 8 {
+            return Err(Error::Invalid);
+        }
+
+        let internal_size = u32::from_ne_bytes(data[0..4].try_into().unwrap()) as usize;
+        let size = 8 + internal_size + pad_8(internal_size);
+
+        if size > data.len() {
+            return Err(Error::Invalid);
+        }
+
+        let type_ = Type::try_from(u32::from_ne_bytes(data[4..8].try_into().unwrap()))
+            .map_err(|_| Error::Invalid)?;
+
+        Ok(PodData {
+            size: size as usize,
+            type_,
+            data: &data[0..size],
+        })
+    }
+
+    pub fn total_size(&self) -> usize {
+        self.size
+    }
+
+    pub fn type_(&self) -> Type {
+        self.type_
+    }
+
+    pub fn decode<T>(&self) -> Result<<T as Pod>::DecodesTo, Error>
+    where
+        T: Pod,
+    {
+        T::decode(self.data).map(|v| v.0)
+    }
+}
+
 impl<T> Pod for T
 where
     T: Primitive,

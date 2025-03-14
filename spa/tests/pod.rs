@@ -5,9 +5,10 @@
 use std::ffi::c_void;
 
 use pipewire_native_spa::pod::builder::Builder;
+use pipewire_native_spa::pod::error::Error;
 use pipewire_native_spa::pod::parser::Parser;
 use pipewire_native_spa::pod::types::{
-    Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
+    Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type,
 };
 use pipewire_native_spa::pod::Pod;
 use pipewire_native_spa::types::params::{ParamType, PropInfo};
@@ -410,10 +411,8 @@ fn test_pod_builder_object_empty() {
     let mut parser = Parser::new(&buf);
     assert_eq!(
         parser
-            .pop_object(|_p, type_, id: ParamType| {
-                assert_eq!(type_, ObjectType::PropInfo);
-                assert_eq!(id, ParamType::PropInfo);
-                Ok(())
+            .pop_object::<PropInfo>(|_parser, type_| {
+                assert_eq!(type_, ParamType::PropInfo);
             })
             .unwrap(),
         ()
@@ -458,26 +457,28 @@ fn test_pod_builder_object() {
     let mut parser = Parser::new(&buf);
     assert_eq!(
         parser
-            .pop_object(|p, type_, id: ParamType| {
-                assert_eq!(type_, ObjectType::PropInfo);
-                assert_eq!(id, ParamType::PropInfo);
-                assert_eq!(
-                    p.pop_property::<PropInfo, Id<u32>>().unwrap(),
-                    Property {
-                        key: PropInfo::Id,
-                        flags: PropertyFlags::empty(),
-                        value: Id(1u32)
+            .pop_object::<PropInfo>(|p, type_| {
+                assert_eq!(type_, ParamType::PropInfo);
+
+                'props: loop {
+                    match p.pop_property() {
+                        Ok(Some((key, _flags, data))) => match key {
+                            PropInfo::Id => {
+                                assert_eq!(data.type_(), Type::Id);
+                                assert_eq!(data.decode::<Id<u32>>().unwrap(), Id(1u32));
+                            }
+                            PropInfo::Description => {
+                                assert_eq!(data.type_(), Type::String);
+                                assert_eq!(data.decode::<&str>().unwrap(), "test");
+                            }
+                            k => {
+                                unreachable!("Unexpected key: {:?}", k);
+                            }
+                        },
+                        Ok(None) => break 'props,
+                        Err(e) => unreachable!("Parse error {:?}", e),
                     }
-                );
-                assert_eq!(
-                    p.pop_property::<PropInfo, &str>().unwrap(),
-                    Property {
-                        key: PropInfo::Description,
-                        flags: PropertyFlags::empty(),
-                        value: "test".to_string()
-                    }
-                );
-                Ok(())
+                }
             })
             .unwrap(),
         ()
