@@ -642,7 +642,6 @@ where
         let choice_type = u32::from_ne_bytes(data[8..12].try_into().unwrap());
         // flags is unused, so we don't decode it at [12..16]
         let child_size = u32::from_ne_bytes(data[16..20].try_into().unwrap()) as usize;
-        println!("{size} {child_size} {choice_type}");
         if child_size != T::pod_size() {
             return Err(Error::Invalid);
         }
