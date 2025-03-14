@@ -124,7 +124,7 @@ impl<'a> Parser<'a> {
 
     pub fn pop_object<K>(
         &'a mut self,
-        parse_object: impl FnOnce(&mut ObjectParser<'_>, ParamType),
+        parse_object: impl FnOnce(&mut ObjectParser<'_>, ParamType) -> Result<(), Error>,
     ) -> Result<(), Error>
     where
         K: ParamObject,
@@ -166,7 +166,7 @@ impl<'a> Parser<'a> {
 
         {
             let mut object_parser = ObjectParser::new(&self.data[self.pos..self.pos + size - 8]);
-            parse_object(&mut object_parser, param_type);
+            parse_object(&mut object_parser, param_type)?
         }
 
         // The caller may or may not iterate over all properties, don't depend on that

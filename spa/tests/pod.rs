@@ -412,6 +412,7 @@ fn test_pod_builder_object_empty() {
         parser
             .pop_object::<PropInfo>(|_parser, type_| {
                 assert_eq!(type_, ParamType::PropInfo);
+                Ok(())
             })
             .unwrap(),
         ()
@@ -459,7 +460,7 @@ fn test_pod_builder_object() {
             .pop_object::<PropInfo>(|p, type_| {
                 assert_eq!(type_, ParamType::PropInfo);
 
-                while let Ok(Some((key, _flags, data))) = p.pop_property() {
+                while let Some((key, _flags, data)) = p.pop_property()? {
                     match key {
                         PropInfo::Id => {
                             assert_eq!(data.type_(), Type::Id);
@@ -475,7 +476,7 @@ fn test_pod_builder_object() {
                     }
                 }
 
-                assert!(p.done());
+                Ok(())
             })
             .unwrap(),
         ()
