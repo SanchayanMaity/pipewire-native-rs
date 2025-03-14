@@ -62,7 +62,7 @@ impl<'a> PodData<'a> {
             .map_err(|_| Error::Invalid)?;
 
         Ok(PodData {
-            size: size as usize,
+            size,
             type_,
             data: &data[0..size],
         })

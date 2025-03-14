@@ -25,7 +25,7 @@ pub fn derive_enum_u32(input: TokenStream) -> TokenStream {
     let value_ident: Ident = parse_quote! { value };
 
     for v in data.variants {
-        if v.fields.len() > 0 {
+        if !v.fields.is_empty() {
             return quote! {}.into();
         }
 
