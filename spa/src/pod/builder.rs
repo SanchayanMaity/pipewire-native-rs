@@ -191,7 +191,7 @@ impl<'a> Builder<'a> {
     // |              |
     // +--------------+
     //
-    pub fn push_object<T, F>(mut self, type_: ObjectType, id: T, build_object: F) -> Self
+    pub fn push_object<T, F>(mut self, type_: ObjectType, param_type: T, build_object: F) -> Self
     where
         T: Into<u32> + TryFrom<u32>,
         F: FnOnce(ObjectBuilder) -> ObjectBuilder,
@@ -222,7 +222,7 @@ impl<'a> Builder<'a> {
         ret.data[old_pos..old_pos + 4].copy_from_slice(&(size as u32).to_ne_bytes());
         ret.data[old_pos + 4..old_pos + 8].copy_from_slice(&(Type::Object as u32).to_ne_bytes());
         ret.data[old_pos + 8..old_pos + 12].copy_from_slice(&(type_ as u32).to_ne_bytes());
-        ret.data[old_pos + 12..old_pos + 16].copy_from_slice(&id.into().to_ne_bytes());
+        ret.data[old_pos + 12..old_pos + 16].copy_from_slice(&param_type.into().to_ne_bytes());
 
         ret
     }
