@@ -5,7 +5,6 @@
 use std::ffi::c_void;
 
 use pipewire_native_spa::pod::builder::Builder;
-use pipewire_native_spa::pod::error::Error;
 use pipewire_native_spa::pod::parser::Parser;
 use pipewire_native_spa::pod::types::{
     Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type,
@@ -460,25 +459,23 @@ fn test_pod_builder_object() {
             .pop_object::<PropInfo>(|p, type_| {
                 assert_eq!(type_, ParamType::PropInfo);
 
-                'props: loop {
-                    match p.pop_property() {
-                        Ok(Some((key, _flags, data))) => match key {
-                            PropInfo::Id => {
-                                assert_eq!(data.type_(), Type::Id);
-                                assert_eq!(data.decode::<Id<u32>>().unwrap(), Id(1u32));
-                            }
-                            PropInfo::Description => {
-                                assert_eq!(data.type_(), Type::String);
-                                assert_eq!(data.decode::<&str>().unwrap(), "test");
-                            }
-                            k => {
-                                unreachable!("Unexpected key: {:?}", k);
-                            }
-                        },
-                        Ok(None) => break 'props,
-                        Err(e) => unreachable!("Parse error {:?}", e),
+                while let Ok(Some((key, _flags, data))) = p.pop_property() {
+                    match key {
+                        PropInfo::Id => {
+                            assert_eq!(data.type_(), Type::Id);
+                            assert_eq!(data.decode::<Id<u32>>().unwrap(), Id(1u32));
+                        }
+                        PropInfo::Description => {
+                            assert_eq!(data.type_(), Type::String);
+                            assert_eq!(data.decode::<&str>().unwrap(), "test");
+                        }
+                        k => {
+                            unreachable!("Unexpected key: {:?}", k);
+                        }
                     }
                 }
+
+                assert!(p.done());
             })
             .unwrap(),
         ()

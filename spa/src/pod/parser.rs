@@ -186,6 +186,10 @@ impl<'a> ObjectParser<'a> {
         ObjectParser { data, pos: 0 }
     }
 
+    pub fn done(&self) -> bool {
+        self.data.len() - self.pos == 0
+    }
+
     pub fn pop_property<K>(&mut self) -> Result<Option<(K, PropertyFlags, PodData<'a>)>, Error>
     where
         K: TryFrom<u32> + ParamObject,
