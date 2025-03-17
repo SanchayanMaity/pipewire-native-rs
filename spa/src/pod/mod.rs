@@ -39,14 +39,14 @@ fn pad_8(size: usize) -> usize {
     }
 }
 
-pub struct PodData<'a> {
+pub struct RawPod<'a> {
     size: usize,
     type_: Type,
     data: &'a [u8],
 }
 
-impl<'a> PodData<'a> {
-    pub fn wrap(data: &'a [u8]) -> Result<PodData<'a>, Error> {
+impl<'a> RawPod<'a> {
+    pub fn wrap(data: &'a [u8]) -> Result<RawPod<'a>, Error> {
         if data.len() < 8 {
             return Err(Error::Invalid);
         }
@@ -61,7 +61,7 @@ impl<'a> PodData<'a> {
         let type_ = Type::try_from(u32::from_ne_bytes(data[4..8].try_into().unwrap()))
             .map_err(|_| Error::Invalid)?;
 
-        Ok(PodData {
+        Ok(RawPod {
             size,
             type_,
             data: &data[0..size],

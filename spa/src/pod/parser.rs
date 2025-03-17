@@ -6,7 +6,7 @@ use crate::types::params::{ParamObject, ParamType};
 
 use super::error::Error;
 use super::types::{Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type};
-use super::{Pod, PodData, Primitive};
+use super::{Pod, Primitive, RawPod};
 
 pub struct Parser<'a> {
     data: &'a [u8],
@@ -190,7 +190,7 @@ impl<'a> ObjectParser<'a> {
         self.data.len() - self.pos == 0
     }
 
-    pub fn pop_property<K>(&mut self) -> Result<Option<(K, PropertyFlags, PodData<'a>)>, Error>
+    pub fn pop_property<K>(&mut self) -> Result<Option<(K, PropertyFlags, RawPod<'a>)>, Error>
     where
         K: TryFrom<u32> + ParamObject,
     {
@@ -218,7 +218,7 @@ impl<'a> ObjectParser<'a> {
 
         self.pos += 8;
 
-        let data = PodData::wrap(&self.data[self.pos..])?;
+        let data = RawPod::wrap(&self.data[self.pos..])?;
 
         self.pos += data.total_size();
 
