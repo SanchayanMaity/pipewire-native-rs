@@ -410,12 +410,12 @@ fn test_pod_builder_object_empty() {
     let mut parser = Parser::new(&buf);
     assert_eq!(
         parser
-            .pop_object::<PropInfo>(|_parser, type_| {
+            .pop_object::<PropInfo, _>(|_parser, type_| {
                 assert_eq!(type_, ParamType::PropInfo);
                 Ok(())
             })
             .unwrap(),
-        16
+        ((), 16)
     );
 }
 
@@ -457,7 +457,7 @@ fn test_pod_builder_object() {
     let mut parser = Parser::new(&buf);
     assert_eq!(
         parser
-            .pop_object::<PropInfo>(|p, type_| {
+            .pop_object::<PropInfo, _>(|p, type_| {
                 assert_eq!(type_, ParamType::PropInfo);
 
                 while let Some((key, _flags, data)) = p.pop_property()? {
@@ -479,6 +479,6 @@ fn test_pod_builder_object() {
                 Ok(())
             })
             .unwrap(),
-        64
+        ((), 64)
     );
 }
