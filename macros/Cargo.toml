@@ -8,5 +8,8 @@ syn = { version = "*", features = ["extra-traits", "full"] }
 quote = "*"
 proc-macro2 = "*"
 
+[dev-dependencies]
+pipewire-native-spa = { path = "../spa" }
+
 [lib]
 proc-macro = true
