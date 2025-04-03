@@ -36,7 +36,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub fn push_pod<U: Pod>(mut self, value: U) -> Self {
+    pub fn push_pod<U: Pod>(mut self, value: &U) -> Self {
         if self.error.is_none() {
             match value.encode(&mut self.data[self.pos..]) {
                 Ok(size) => self.pos += size,
@@ -48,58 +48,58 @@ impl<'a> Builder<'a> {
     }
 
     pub fn push_none(self) -> Self {
-        self.push_pod(())
+        self.push_pod(&())
     }
 
     pub fn push_bool(self, value: bool) -> Self {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_id<T>(self, value: Id<T>) -> Self
     where
         T: Into<u32> + TryFrom<u32> + Copy,
     {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_int(self, value: i32) -> Self {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_long(self, value: i64) -> Self {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_float(self, value: f32) -> Self {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_double(self, value: f64) -> Self {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_fd(self, value: RawFd) -> Self {
-        self.push_pod(Fd(value))
+        self.push_pod(&Fd(value))
     }
 
     pub fn push_rectangle(self, width: u32, height: u32) -> Self {
-        self.push_pod(Rectangle { width, height })
+        self.push_pod(&Rectangle { width, height })
     }
 
     pub fn push_fraction(self, num: u32, denom: u32) -> Self {
-        self.push_pod(Fraction { num, denom })
+        self.push_pod(&Fraction { num, denom })
     }
 
     pub fn push_string(self, value: &str) -> Self {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_bytes(self, value: &[u8]) -> Self {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     pub fn push_pointer(self, typ: Type, value: *const c_void) -> Self {
-        self.push_pod(Pointer {
+        self.push_pod(&Pointer {
             type_: typ,
             ptr: value,
         })
@@ -109,14 +109,14 @@ impl<'a> Builder<'a> {
     where
         T: Pod + Primitive,
     {
-        self.push_pod(values)
+        self.push_pod(&values)
     }
 
     pub fn push_choice<T>(self, value: Choice<T>) -> Self
     where
         T: Pod + Primitive,
     {
-        self.push_pod(value)
+        self.push_pod(&value)
     }
 
     // Struct is encoded as
@@ -241,7 +241,7 @@ impl<'a> StructBuilder<'a> {
         self.builder
     }
 
-    pub fn push_pod<U: Pod>(self, value: U) -> Self {
+    pub fn push_pod<U: Pod>(self, value: &U) -> Self {
         StructBuilder::new(self.builder.push_pod(value))
     }
 
@@ -347,7 +347,7 @@ impl<'a> ObjectBuilder<'a> {
         K: Copy + Into<u32> + TryFrom<u32>,
         V: Pod,
     {
-        self.builder = self.builder.push_pod(Property { key, flags, value });
+        self.builder = self.builder.push_pod(&Property { key, flags, value });
         self
     }
 }
