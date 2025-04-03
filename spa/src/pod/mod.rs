@@ -386,6 +386,19 @@ impl Pod for &str {
     }
 }
 
+impl Pod for String {
+    type DecodesTo = String;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        self.as_str().encode(data)
+    }
+
+    fn decode(data: &[u8]) -> Result<(String, usize), Error> {
+        // &str also decodes to String
+        <&str as Pod>::decode(data)
+    }
+}
+
 impl Pod for &[u8] {
     type DecodesTo = Vec<u8>;
 
@@ -419,6 +432,19 @@ impl Pod for &[u8] {
         }
 
         Ok((data[8..8 + len].to_vec(), 8 + len + padding))
+    }
+}
+
+impl Pod for Vec<u8> {
+    type DecodesTo = Vec<u8>;
+
+    fn encode(&self, data: &mut [u8]) -> Result<usize, Error> {
+        self.as_slice().encode(data)
+    }
+
+    fn decode(data: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+        // &[u8] also decodes to Vec<u8>
+        <&[u8] as Pod>::decode(data)
     }
 }
 
