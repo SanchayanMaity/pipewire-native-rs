@@ -95,7 +95,7 @@ impl<'a> Parser<'a> {
         self.pop_pod::<Choice<T>>()
     }
 
-    pub fn pop_struct<F>(&mut self, parse_struct: F) -> Result<(), Error>
+    pub fn pop_struct<F>(&mut self, parse_struct: F) -> Result<usize, Error>
     where
         F: FnOnce(&mut Parser) -> Result<(), Error>,
     {
@@ -120,7 +120,7 @@ impl<'a> Parser<'a> {
         // The caller may or may not iterate over all fields, don't depend on that
         self.pos += size + 8;
 
-        Ok(())
+        Ok(size + 8)
     }
 
     pub fn pop_object<K>(

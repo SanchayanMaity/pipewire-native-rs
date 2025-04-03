@@ -323,7 +323,7 @@ fn test_pod_builder_struct_empty() {
     assert_eq!(res, sbuf.as_slice());
 
     let mut parser = Parser::new(&buf);
-    assert_eq!(parser.pop_struct(|_| Ok(())).unwrap(), ());
+    assert_eq!(parser.pop_struct(|_| Ok(())).unwrap(), 8);
 }
 
 #[test]
@@ -377,7 +377,7 @@ fn test_pod_builder_struct() {
                 Ok(())
             })
             .unwrap(),
-        ()
+        72
     );
 }
 
