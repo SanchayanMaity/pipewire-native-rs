@@ -415,7 +415,7 @@ fn test_pod_builder_object_empty() {
                 Ok(())
             })
             .unwrap(),
-        ()
+        16
     );
 }
 
@@ -479,6 +479,6 @@ fn test_pod_builder_object() {
                 Ok(())
             })
             .unwrap(),
-        ()
+        64
     );
 }

@@ -126,7 +126,7 @@ impl<'a> Parser<'a> {
     pub fn pop_object<K>(
         &'a mut self,
         parse_object: impl FnOnce(&mut ObjectParser<'_>, ParamType) -> Result<(), Error>,
-    ) -> Result<(), Error>
+    ) -> Result<usize, Error>
     where
         K: ParamObject,
     {
@@ -173,7 +173,7 @@ impl<'a> Parser<'a> {
         // The caller may or may not iterate over all properties, don't depend on that
         self.pos += size - 8;
 
-        Ok(())
+        Ok(size + 8)
     }
 }
 
