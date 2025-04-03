@@ -117,7 +117,8 @@ impl<'a> Parser<'a> {
         let mut struct_parser = Parser::new(&self.data[self.pos + 8..self.pos + 8 + size]);
         parse_struct(&mut struct_parser)?;
 
-        self.pos += struct_parser.pos;
+        // The caller may or may not iterate over all fields, don't depend on that
+        self.pos += size + 8;
 
         Ok(())
     }
