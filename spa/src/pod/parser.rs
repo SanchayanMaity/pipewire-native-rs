@@ -95,9 +95,9 @@ impl<'a> Parser<'a> {
         self.pop_pod::<Choice<T>>()
     }
 
-    pub fn pop_struct<F>(&mut self, parse_struct: F) -> Result<usize, Error>
+    pub fn pop_struct<F, T>(&mut self, parse_struct: F) -> Result<(T, usize), Error>
     where
-        F: FnOnce(&mut Parser) -> Result<(), Error>,
+        F: FnOnce(&mut Parser) -> Result<T, Error>,
     {
         if self.data.len() < 8 {
             return Err(Error::Invalid);
@@ -115,12 +115,12 @@ impl<'a> Parser<'a> {
         }
 
         let mut struct_parser = Parser::new(&self.data[self.pos + 8..self.pos + 8 + size]);
-        parse_struct(&mut struct_parser)?;
+        let ret = parse_struct(&mut struct_parser)?;
 
         // The caller may or may not iterate over all fields, don't depend on that
         self.pos += size + 8;
 
-        Ok(size + 8)
+        Ok((ret, size + 8))
     }
 
     pub fn pop_object<K>(
