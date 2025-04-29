@@ -4,9 +4,8 @@
 
 use crate::types::params::{ParamObject, ParamType};
 
-use super::error::Error;
 use super::types::{Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type};
-use super::{Pod, Primitive, RawPod};
+use super::{Error, Pod, Primitive, RawPod};
 
 pub struct Parser<'a> {
     data: &'a [u8],

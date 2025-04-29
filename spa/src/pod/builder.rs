@@ -7,11 +7,10 @@ use std::os::fd::RawFd;
 
 use crate::types::params::ParamType;
 
-use super::error::Error;
 use super::types::{
     Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,
 };
-use super::{Pod, Primitive};
+use super::{Error, Pod, Primitive};
 
 pub struct Builder<'a> {
     data: &'a mut [u8],

@@ -3,15 +3,19 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 pub mod builder;
-pub mod error;
 pub mod parser;
 pub mod types;
 
 use std::ffi::c_void;
 use std::os::fd::RawFd;
 
-use error::Error;
 use types::{Choice, Fd, Fraction, Id, Pointer, Property, PropertyFlags, Rectangle, Type};
+
+#[derive(Debug)]
+pub enum Error {
+    Invalid,
+    NoSpace,
+}
 
 pub trait Pod {
     // Default to Self once that is stable, or try to generate references to owned data
