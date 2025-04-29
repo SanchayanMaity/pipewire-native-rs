@@ -5,7 +5,7 @@
 use std::ffi::c_void;
 use std::os::fd::RawFd;
 
-use crate::types::params::ParamType;
+use crate::param::ParamType;
 
 use super::types::{
     Choice, Fd, Fraction, Id, ObjectType, Pointer, Property, PropertyFlags, Rectangle, Type,

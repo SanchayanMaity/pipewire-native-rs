@@ -4,13 +4,14 @@
 
 use std::ffi::c_void;
 
+use pipewire_native_spa::param::props::PropInfo;
+use pipewire_native_spa::param::ParamType;
 use pipewire_native_spa::pod::builder::Builder;
 use pipewire_native_spa::pod::parser::Parser;
 use pipewire_native_spa::pod::types::{
     Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type,
 };
 use pipewire_native_spa::pod::Pod;
-use pipewire_native_spa::types::params::{ParamType, PropInfo};
 
 use libspa::pod as spa_pod;
 use libspa::sys::{self as spa_sys};

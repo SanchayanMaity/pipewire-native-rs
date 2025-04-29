@@ -6,6 +6,8 @@ use pipewire_native_macros::EnumU32;
 
 use crate::pod::types::ObjectType;
 
+pub mod props;
+
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
 pub enum ParamType {
@@ -31,21 +33,4 @@ pub enum ParamType {
 
 pub trait ParamObject {
     const TYPE: ObjectType;
-}
-
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, EnumU32)]
-pub enum PropInfo {
-    Start,
-    Id,
-    Name,
-    Type,
-    Labels,
-    Container,
-    Params,
-    Description,
-}
-
-impl ParamObject for PropInfo {
-    const TYPE: ObjectType = ObjectType::PropInfo;
 }

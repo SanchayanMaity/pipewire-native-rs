@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use crate::types::params::{ParamObject, ParamType};
+use crate::param::{ParamObject, ParamType};
 
 use super::types::{Choice, Fd, Fraction, Id, ObjectType, Pointer, PropertyFlags, Rectangle, Type};
 use super::{Error, Pod, Primitive, RawPod};
