@@ -44,7 +44,7 @@ pub enum ObjectType {
     Format,
     ParamBuffers,
     ParamMeta,
-    ParamIO,
+    ParamIo,
     ParamProfile,
     ParamPortConfig,
     ParamRoute,

@@ -6,6 +6,7 @@ use pipewire_native_macros::EnumU32;
 
 use crate::pod::types::ObjectType;
 
+pub mod buffers;
 pub mod format;
 pub mod props;
 
