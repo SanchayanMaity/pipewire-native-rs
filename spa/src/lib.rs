@@ -8,3 +8,7 @@ pub mod param;
 pub mod pod;
 
 pub type Dict = HashMap<String, String>;
+
+pub fn atob(s: &String) -> bool {
+    s == "true" || s == "1"
+}
