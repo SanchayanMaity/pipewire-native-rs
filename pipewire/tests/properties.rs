@@ -31,8 +31,7 @@ fn test_properties_json() {
         },
         "context.objects": [
           {
-            "factory": "spa-node-factory",
-            "args": { }
+            "factory": "spa-node-factory"
           }
         ]
     }
@@ -40,9 +39,10 @@ fn test_properties_json() {
 
     let props = Properties::new_string(conf).expect("config parsing should succeed");
 
+    assert_eq!(props.dict().keys().len(), 3);
     assert_eq!(props.get("context.properties"), Some(&"{}".to_string()));
     assert_eq!(
         props.get("context.objects"),
-        Some(&r#"[{"factory":"spa-node-factory","args":{}}]"#.to_string())
+        Some(&r#"[{"factory":"spa-node-factory"}]"#.to_string())
     );
 }
