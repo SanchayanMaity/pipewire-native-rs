@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 pipewire-native-macros = { path = "../macros" }
 pipewire-native-spa = { path = "../spa" }
+tinyjson = "2.5.1"

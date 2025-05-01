@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 
 use pipewire_native_spa::Dict;
+use tinyjson::{JsonParseError, JsonValue};
 
 #[derive(Clone, Debug)]
 pub struct Properties {
@@ -22,6 +23,15 @@ impl Properties {
         Self { dict }
     }
 
+    pub fn new_string(args: &str) -> Result<Self, String> {
+        let mut p = Self::new();
+
+        match p.update_string(args) {
+            Ok(_) => Ok(p),
+            Err(e) => Err(e),
+        }
+    }
+
     /* Easier to provide read-only access to the dict, but maybe we should just implement Iter */
     pub fn dict(&self) -> &Dict {
         &self.dict
@@ -29,6 +39,10 @@ impl Properties {
 
     pub fn set(&mut self, key: &str, value: String) {
         self.dict.insert(key.to_string(), value);
+    }
+
+    pub fn unset(&mut self, key: &str) -> Option<String> {
+        self.dict.remove(key)
     }
 
     pub fn get(&self, key: &str) -> Option<&String> {
@@ -55,6 +69,42 @@ impl Properties {
         self.get(key).map(pipewire_native_spa::atob)
     }
 
+    pub fn update_string(&mut self, args: &str) -> Result<u32, String> {
+        let parsed: JsonValue = args.parse().map_err(|e: JsonParseError| e.to_string())?;
+
+        if !parsed.is_object() {
+            return Ok(0);
+        }
+
+        let map = match parsed {
+            JsonValue::Object(m) => m,
+            _ => return Ok(0),
+        };
+
+        let mut count = 0;
+
+        for (k, v) in map {
+            if v.is_null() {
+                self.unset(k.as_ref());
+            } else {
+                let old_v = self.get(k.as_ref());
+                let value = v
+                    .stringify()
+                    .expect("parsed value should convert back to a String");
+
+                if old_v == Some(&value) {
+                    /* Unchanged */
+                    continue;
+                }
+
+                self.set(k.as_ref(), value);
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
     pub fn update_keys(&mut self, dict: &Dict, keys: Vec<&str>) {
         for k in keys {
             if let Some(v) = dict.get(k) {
@@ -72,6 +122,4 @@ impl Properties {
             self.set(k, v.clone());
         }
     }
-
-    /* TODO: new_string() and update_string() need SPA JSON parsing */
 }
