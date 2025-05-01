@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 pipewire-native-macros = { path = "../macros" }
 bitflags = "2.8.0"
+libc = "0.2.172"
 
 [dev-dependencies]
 # For tests
