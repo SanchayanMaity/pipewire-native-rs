@@ -1,0 +1,8 @@
+[package]
+name = "pipewire-native"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pipewire-native-macros = { path = "../macros" }
+pipewire-native-spa = { path = "../spa" }
