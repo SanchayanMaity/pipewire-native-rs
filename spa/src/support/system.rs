@@ -101,3 +101,7 @@ impl system::System for System {
         result_or_error(res)
     }
 }
+
+unsafe impl Send for System {}
+
+unsafe impl Sync for System {}
