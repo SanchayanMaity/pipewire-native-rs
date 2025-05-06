@@ -25,7 +25,7 @@ pub struct Loop {
 impl Loop {
     pub fn new() -> std::io::Result<LoopImpl> {
         let system = Box::new(
-            super::support()
+            super::plugin()
                 .get_interface::<SystemImpl>(interface::SYSTEM)
                 .unwrap(),
         );

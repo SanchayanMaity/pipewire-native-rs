@@ -10,8 +10,8 @@ pub mod r#loop;
 pub mod plugin;
 pub mod system;
 
-static SUPPORT: LazyLock<Plugin> = LazyLock::new(|| Plugin::new());
+static PLUGIN: LazyLock<Plugin> = LazyLock::new(|| Plugin::new());
 
-fn support() -> &'static Plugin {
-    &*SUPPORT
+fn plugin() -> &'static Plugin {
+    &*PLUGIN
 }
