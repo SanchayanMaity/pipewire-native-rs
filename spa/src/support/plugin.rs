@@ -4,13 +4,33 @@
 
 use std::sync::LazyLock;
 
-use crate::interface::system;
+use crate::interface::{
+    self,
+    plugin::{Handle, Interface},
+    system::SystemImpl,
+};
 
-use super::system::System;
+use super::system;
 
-static SYSTEM: LazyLock<Box<dyn system::System + Send + Sync>> =
-    LazyLock::new(|| Box::new(System::new()));
+static SYSTEM: LazyLock<SystemImpl> = LazyLock::new(|| system::System::new());
 
-pub fn system() -> &'static dyn system::System {
-    &**SYSTEM
+pub struct Plugin {}
+
+impl Plugin {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Handle for Plugin {
+    const VERSION: u32 = 0;
+
+    fn get_interface<T: Interface>(&self, type_: &str) -> Option<&'static T> {
+        match type_ {
+            interface::SYSTEM => unsafe { Some(&*(&*SYSTEM as *const dyn Interface as *const T)) },
+            _ => None,
+        }
+    }
+
+    fn clear(&self) {}
 }

@@ -4,13 +4,15 @@
 
 use std::{io::Error, os::fd::RawFd};
 
-use crate::interface::system::{self, PollEvent, PollEvents};
+use crate::interface::system::{self, PollEvent, PollEvents, SystemImpl};
 
 pub struct System {}
 
 impl System {
-    pub fn new() -> Self {
-        System {}
+    pub fn new() -> SystemImpl {
+        SystemImpl {
+            inner: Box::new(System {}),
+        }
     }
 }
 

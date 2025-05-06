@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::os::fd::RawFd;
+use std::{ops::Deref, os::fd::RawFd};
 
 use bitflags::bitflags;
+
+use super::plugin::Interface;
 
 #[repr(C, packed(1))]
 pub struct PollEvent {
@@ -56,3 +58,20 @@ pub trait System {
         timeout: i32,
     ) -> std::io::Result<i32>;
 }
+
+pub struct SystemImpl {
+    pub inner: Box<dyn System>,
+}
+
+impl Deref for SystemImpl {
+    type Target = dyn System;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
+    }
+}
+
+impl Interface for SystemImpl {}
+
+unsafe impl Send for SystemImpl {}
+unsafe impl Sync for SystemImpl {}

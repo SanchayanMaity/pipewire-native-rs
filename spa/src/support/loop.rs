@@ -7,28 +7,36 @@ use std::io::{Error, ErrorKind};
 use std::os::fd::RawFd;
 use std::pin::Pin;
 
+use crate::interface;
+use crate::interface::plugin::Handle;
+use crate::interface::r#loop::LoopImpl;
+use crate::interface::system::SystemImpl;
 use crate::interface::{
     r#loop::{self, InvokeFn, Source},
-    system::{self, PollEvents, System},
+    system::{self, PollEvents},
 };
 
-use super::plugin;
-
 pub struct Loop {
-    system: Box<&'static dyn System>,
+    system: Box<&'static SystemImpl>,
     pollfd: RawFd,
     sources: HashMap<RawFd, Pin<Box<Source>>>,
 }
 
 impl Loop {
-    pub fn new() -> std::io::Result<Self> {
-        let system = Box::new(plugin::system());
+    pub fn new() -> std::io::Result<LoopImpl> {
+        let system = Box::new(
+            super::support()
+                .get_interface::<SystemImpl>(interface::SYSTEM)
+                .unwrap(),
+        );
         let pollfd = system.pollfd_create(system::POLLFD_CLOEXEC)?;
 
-        Ok(Self {
-            system,
-            pollfd,
-            sources: HashMap::new(),
+        Ok(LoopImpl {
+            inner: Box::new(Self {
+                system,
+                pollfd,
+                sources: HashMap::new(),
+            }),
         })
     }
 }
