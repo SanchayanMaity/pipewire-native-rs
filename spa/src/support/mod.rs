@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 
 use plugin::Plugin;
 
+pub mod ffi;
 pub mod r#loop;
 pub mod plugin;
 pub mod system;
