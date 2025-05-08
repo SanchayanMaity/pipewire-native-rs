@@ -2,19 +2,21 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::sync::LazyLock;
+use std::{collections::HashMap, sync::LazyLock};
 
 use crate::interface::{
     self,
-    plugin::{Handle, Interface},
+    plugin::{Handle, HandleFactory, Interface, InterfaceInfo},
     system::SystemImpl,
 };
 
 use super::system;
 
-static SYSTEM: LazyLock<SystemImpl> = LazyLock::new(|| system::System::new());
+static SYSTEM: LazyLock<SystemImpl> = LazyLock::new(|| system::new());
 
 pub struct Plugin {}
+
+pub struct PluginHandle {}
 
 impl Plugin {
     pub fn new() -> Self {
@@ -22,8 +24,38 @@ impl Plugin {
     }
 }
 
-impl Handle for Plugin {
-    const VERSION: u32 = 0;
+impl HandleFactory for Plugin {
+    fn version(&self) -> u32 {
+        0
+    }
+
+    fn name(&self) -> String {
+        "rust-support".to_string()
+    }
+
+    fn info(&self) -> crate::Dict {
+        HashMap::new()
+    }
+
+    fn init(
+        &self,
+        _: Option<crate::Dict>,
+        _: Option<interface::Support>,
+    ) -> std::io::Result<impl Handle> {
+        Ok(PluginHandle {})
+    }
+
+    fn enum_interface_info(&self) -> Vec<InterfaceInfo> {
+        vec![InterfaceInfo {
+            type_: interface::SYSTEM.to_string(),
+        }]
+    }
+}
+
+impl Handle for PluginHandle {
+    fn version(&self) -> u32 {
+        0
+    }
 
     fn get_interface<T: Interface>(&self, type_: &str) -> Option<&'static T> {
         match type_ {
@@ -32,5 +64,5 @@ impl Handle for Plugin {
         }
     }
 
-    fn clear(&self) {}
+    fn clear(&mut self) {}
 }

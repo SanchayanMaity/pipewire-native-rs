@@ -60,7 +60,15 @@ pub trait System {
 }
 
 pub struct SystemImpl {
-    pub inner: Box<dyn System>,
+    inner: Box<dyn System>,
+}
+
+impl SystemImpl {
+    pub fn new(system: impl System + 'static) -> SystemImpl {
+        SystemImpl {
+            inner: Box::new(system),
+        }
+    }
 }
 
 impl Deref for SystemImpl {

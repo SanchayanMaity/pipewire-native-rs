@@ -8,7 +8,7 @@ use std::os::fd::RawFd;
 use std::pin::Pin;
 
 use crate::interface;
-use crate::interface::plugin::Handle;
+use crate::interface::plugin::{Handle, HandleFactory};
 use crate::interface::r#loop::LoopImpl;
 use crate::interface::system::SystemImpl;
 use crate::interface::{
@@ -26,6 +26,8 @@ impl Loop {
     pub fn new() -> std::io::Result<LoopImpl> {
         let system = Box::new(
             super::plugin()
+                .init(None, None)
+                .unwrap()
                 .get_interface::<SystemImpl>(interface::SYSTEM)
                 .unwrap(),
         );

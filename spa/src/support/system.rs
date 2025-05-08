@@ -6,14 +6,10 @@ use std::{io::Error, os::fd::RawFd};
 
 use crate::interface::system::{self, PollEvent, PollEvents, SystemImpl};
 
-pub struct System {}
+struct System {}
 
-impl System {
-    pub fn new() -> SystemImpl {
-        SystemImpl {
-            inner: Box::new(System {}),
-        }
-    }
+pub fn new() -> SystemImpl {
+    SystemImpl::new(System {})
 }
 
 fn result_or_error(res: i32) -> std::io::Result<i32> {
@@ -105,5 +101,4 @@ impl system::System for System {
 }
 
 unsafe impl Send for System {}
-
 unsafe impl Sync for System {}
