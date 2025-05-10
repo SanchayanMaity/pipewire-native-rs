@@ -4,9 +4,12 @@
 
 use std::any::Any;
 
+use pipewire_native_macros::EnumU32;
+
 use super::plugin::Interface;
 
-#[derive(Copy, Clone, Debug)]
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, EnumU32)]
 pub enum LogLevel {
     None = 0,
     Error,
@@ -26,6 +29,7 @@ pub struct LogTopic {
 /* TODO: need some macros to make logging less cumbersome */
 pub struct LogImpl {
     pub inner: Box<dyn Any>,
+    pub level: LogLevel,
 
     pub log: fn(
         this: &LogImpl,
