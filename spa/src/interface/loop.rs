@@ -18,7 +18,7 @@ pub struct Source {
 pub type InvokeFn = dyn FnMut(LoopImpl, bool, u32) -> i32;
 
 pub struct LoopImpl {
-    pub inner: Box<dyn Any>,
+    pub inner: Pin<Box<dyn Any>>,
 
     pub add_source: fn(&mut LoopImpl, source: Pin<Box<Source>>) -> std::io::Result<i32>,
     pub update_source: fn(&mut LoopImpl, source: Pin<Box<Source>>) -> std::io::Result<i32>,

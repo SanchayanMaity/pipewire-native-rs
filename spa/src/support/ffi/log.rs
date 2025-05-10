@@ -69,7 +69,7 @@ pub fn new_impl(interface: *mut CInterface) -> LogImpl {
     let clevel = unsafe { (interface as *mut CLog).as_ref().unwrap().level };
 
     LogImpl {
-        inner: Box::new(interface as *mut CLog),
+        inner: Box::pin(interface as *mut CLog),
         level: LogLevel::try_from(clevel as u32).unwrap(),
 
         log: CLogImpl::log,

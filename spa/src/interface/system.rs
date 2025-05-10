@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{any::Any, os::fd::RawFd};
+use std::{any::Any, os::fd::RawFd, pin::Pin};
 
 use bitflags::bitflags;
 
@@ -35,7 +35,7 @@ bitflags! {
 }
 
 pub struct SystemImpl {
-    pub inner: Box<dyn Any>,
+    pub inner: Pin<Box<dyn Any>>,
 
     pub pollfd_create: fn(this: &SystemImpl, flags: i32) -> std::io::Result<i32>,
     pub pollfd_add: fn(

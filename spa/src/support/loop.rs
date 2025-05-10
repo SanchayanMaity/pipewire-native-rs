@@ -36,7 +36,7 @@ impl Loop {
         let pollfd = system.pollfd_create(system::POLLFD_CLOEXEC)?;
 
         Ok(LoopImpl {
-            inner: Box::new(Self {
+            inner: Box::pin(Self {
                 system,
                 pollfd,
                 sources: HashMap::new(),
@@ -55,7 +55,9 @@ impl Loop {
         this: &mut LoopImpl,
         mut source: Pin<Box<r#loop::Source>>,
     ) -> std::io::Result<i32> {
-        let self_ = this.inner.as_mut().downcast_mut::<Loop>().unwrap();
+        // Shenanigans until downcast_mut_unchecked() is stable
+        let inner = unsafe { Pin::into_inner_unchecked(this.inner.as_mut()) };
+        let self_ = unsafe { &mut *(inner as *mut dyn Any as *mut Loop) };
 
         let fd = source.fd;
         let events =
@@ -72,7 +74,9 @@ impl Loop {
         this: &mut LoopImpl,
         source: Pin<Box<r#loop::Source>>,
     ) -> std::io::Result<i32> {
-        let self_ = this.inner.as_mut().downcast_mut::<Loop>().unwrap();
+        // Shenanigans until downcast_mut_unchecked() is stable
+        let inner = unsafe { Pin::into_inner_unchecked(this.inner.as_mut()) };
+        let self_ = unsafe { &mut *(inner as *mut dyn Any as *mut Loop) };
 
         let fd = source.fd;
         let events =
@@ -85,7 +89,9 @@ impl Loop {
     }
 
     fn remove_source(this: &mut LoopImpl, fd: RawFd) -> std::io::Result<i32> {
-        let self_ = this.inner.as_mut().downcast_mut::<Loop>().unwrap();
+        // Shenanigans until downcast_mut_unchecked() is stable
+        let inner = unsafe { Pin::into_inner_unchecked(this.inner.as_mut()) };
+        let self_ = unsafe { &mut *(inner as *mut dyn Any as *mut Loop) };
 
         self_.system.pollfd_del(self_.pollfd, fd)?;
         self_.sources.remove(&fd);

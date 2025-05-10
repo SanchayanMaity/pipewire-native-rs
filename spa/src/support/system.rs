@@ -10,7 +10,7 @@ struct System {}
 
 pub fn new() -> SystemImpl {
     SystemImpl {
-        inner: Box::new(System {}),
+        inner: Box::pin(System {}),
 
         pollfd_create: System::pollfd_create,
         pollfd_add: System::pollfd_add,

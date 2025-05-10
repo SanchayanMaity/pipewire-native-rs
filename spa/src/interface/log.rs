@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::any::Any;
+use std::{any::Any, pin::Pin};
 
 use pipewire_native_macros::EnumU32;
 
@@ -28,7 +28,7 @@ pub struct LogTopic {
 
 /* TODO: need some macros to make logging less cumbersome */
 pub struct LogImpl {
-    pub inner: Box<dyn Any>,
+    pub inner: Pin<Box<dyn Any>>,
     pub level: LogLevel,
 
     pub log: fn(
