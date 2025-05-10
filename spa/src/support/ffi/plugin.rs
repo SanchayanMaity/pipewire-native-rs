@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CStr};
 use std::path::PathBuf;
 
 use libloading::os::unix::{Library, Symbol, RTLD_NOW};
 
+use crate::dict::Dict;
 use crate::interface::plugin::{Handle, HandleFactory, Interface, InterfaceInfo};
 use crate::interface::{self, Support};
 
@@ -19,13 +19,16 @@ type EntryPointFn = unsafe extern "C" fn(*const *mut CHandleFactory, *mut u32) -
 
 pub struct Plugin {
     _library: Library,
-    factories: Vec<CHandleFactory>,
+    factories: Vec<*mut CHandleFactory>,
 }
 
 impl Plugin {
     pub fn find_factory(&self, name: &str) -> Option<&impl HandleFactory> {
         for f in &self.factories {
-            let f_name = unsafe { CStr::from_ptr(f.name).to_str() };
+            let f_name = unsafe {
+                let factory = f.as_ref().unwrap();
+                CStr::from_ptr(factory.name).to_str()
+            };
 
             if f_name == Ok(name) {
                 return Some(f);
@@ -51,63 +54,54 @@ impl Clone for CInterfaceInfo {
 }
 
 #[repr(C)]
-#[derive(Copy)]
 pub struct CHandleFactory {
     pub version: u32,
     pub name: *const c_char,
-    pub info: *const c_void,
+    pub info: *const Dict,
 
-    pub get_size: fn(*const CHandleFactory, *const c_void) -> usize,
-    pub init: fn(*const CHandleFactory, *mut CHandle, *const c_void, *const c_void, u32) -> c_int,
+    pub get_size: fn(*const CHandleFactory, *const Dict) -> usize,
+    pub init: fn(*const CHandleFactory, *mut CHandle, *const Dict, *const c_void, u32) -> c_int,
     pub enum_interface_info:
         fn(*const CHandleFactory, *const *mut CInterfaceInfo, *mut u32) -> c_int,
 }
 
-impl Clone for CHandleFactory {
-    fn clone(&self) -> Self {
-        CHandleFactory {
-            version: self.version,
-            name: unsafe { libc::strdup(self.name) },
-            info: std::ptr::null(), /* FIXME: implement spa_dict */
-            get_size: self.get_size,
-            init: self.init,
-            enum_interface_info: self.enum_interface_info,
+impl HandleFactory for *mut CHandleFactory {
+    fn version(&self) -> u32 {
+        unsafe { self.as_ref().unwrap().version }
+    }
+
+    fn name(&self) -> &str {
+        unsafe {
+            CStr::from_ptr(self.as_ref().unwrap().name)
+                .to_str()
+                .unwrap()
         }
     }
-}
 
-impl HandleFactory for CHandleFactory {
-    fn version(&self) -> u32 {
-        self.version
+    fn info(&self) -> Option<&Dict> {
+        unsafe { self.as_ref().unwrap().info.as_ref() }
     }
 
-    fn name(&self) -> String {
-        unsafe { CStr::from_ptr(self.name).to_string_lossy().to_string() }
-    }
+    fn init(&self, info: Option<Dict>, _support: Option<Support>) -> std::io::Result<impl Handle> {
+        unsafe {
+            let info_ptr = match &info {
+                Some(i) => i.as_raw(),
+                None => std::ptr::null(),
+            };
+            let size = (self.as_ref().unwrap().get_size)(*self, info_ptr);
+            let handle = libc::malloc(size) as *mut CHandle;
+            let ret = (self.as_ref().unwrap().init)(
+                *self,
+                handle,
+                info_ptr,
+                std::ptr::null(), /* FIXME: implement Support -> spa_supoprt */
+                0,
+            );
 
-    fn info(&self) -> crate::Dict {
-        /* FIXME: implement spa_dict */
-        HashMap::new()
-    }
-
-    fn init(
-        &self,
-        _info: Option<crate::Dict>,
-        _support: Option<Support>,
-    ) -> std::io::Result<impl Handle> {
-        let size = (self.get_size)(self, std::ptr::null() /* FIXME: implement spa_dict */);
-        let handle = unsafe { libc::malloc(size) as *mut CHandle };
-        let ret = (self.init)(
-            self,
-            handle,
-            std::ptr::null(), /* FIXME: implement spa_dict */
-            std::ptr::null(), /* FIXME: implement Support -> spa_supoprt */
-            0,
-        );
-
-        match ret {
-            0 => Ok(handle),
-            err => Err(std::io::Error::from_raw_os_error(err as i32)),
+            match ret {
+                0 => Ok(handle),
+                err => Err(std::io::Error::from_raw_os_error(err as i32)),
+            }
         }
     }
 
@@ -117,11 +111,13 @@ impl HandleFactory for CHandleFactory {
         let mut i: u32 = 0;
 
         loop {
-            match (self.enum_interface_info)(self, &info, &mut i) {
-                1 => interfaces.push(InterfaceInfo {
-                    type_: unsafe { CStr::from_ptr((*info).type_).to_string_lossy().to_string() },
-                }),
-                _ => return interfaces,
+            unsafe {
+                match (self.as_ref().unwrap().enum_interface_info)(*self, &info, &mut i) {
+                    1 => interfaces.push(InterfaceInfo {
+                        type_: CStr::from_ptr((*info).type_).to_string_lossy().to_string(),
+                    }),
+                    _ => return interfaces,
+                }
             }
         }
     }
@@ -187,7 +183,7 @@ pub fn load(path: PathBuf) -> Result<Plugin, String> {
 
         loop {
             match entrypoint(h_ptr, i_ptr) {
-                1 => factories.push(*h),
+                1 => factories.push(h),
                 0 => break,
                 err => return Err(format!("Could not load plugin: {}", err)),
             }

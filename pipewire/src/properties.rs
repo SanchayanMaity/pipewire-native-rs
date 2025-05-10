@@ -4,12 +4,12 @@
 
 use std::collections::HashMap;
 
-use pipewire_native_spa::Dict;
+use pipewire_native_spa::dict::Dict;
 use tinyjson::{JsonParseError, JsonValue};
 
 #[derive(Clone, Debug)]
 pub struct Properties {
-    dict: Dict,
+    dict: HashMap<String, String>,
 }
 
 impl Properties {
@@ -19,8 +19,14 @@ impl Properties {
         }
     }
 
-    pub fn new_dict(dict: Dict) -> Self {
-        Self { dict }
+    pub fn new_dict(dict: &Dict) -> Self {
+        let mut map = HashMap::new();
+
+        for (k, v) in dict.items() {
+            map.insert(k.to_string(), v.to_string());
+        }
+
+        Self { dict: map }
     }
 
     pub fn new_string(args: &str) -> Result<Self, String> {
@@ -32,9 +38,17 @@ impl Properties {
         }
     }
 
-    /* Easier to provide read-only access to the dict, but maybe we should just implement Iter */
-    pub fn dict(&self) -> &Dict {
-        &self.dict
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.dict.iter()
+    }
+
+    pub fn dict(&self) -> Dict {
+        Dict::new(
+            self.dict
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Vec<(String, String)>>(),
+        )
     }
 
     pub fn set(&mut self, key: &str, value: String) {
@@ -106,20 +120,20 @@ impl Properties {
     }
 
     pub fn update_keys(&mut self, dict: &Dict, keys: Vec<&str>) {
-        for k in keys {
-            if let Some(v) = dict.get(k) {
-                self.set(k, v.clone());
+        for (k, v) in dict.items() {
+            if keys.contains(&k) {
+                self.set(k, v.to_string());
             }
         }
     }
 
     pub fn update_ignore(&mut self, dict: &Dict, ignore: Vec<&str>) {
-        for (k, v) in dict {
-            if ignore.contains(&k.as_ref()) {
+        for (k, v) in dict.items() {
+            if ignore.contains(&k) {
                 continue;
             }
 
-            self.set(k, v.clone());
+            self.set(k, v.to_string());
         }
     }
 }

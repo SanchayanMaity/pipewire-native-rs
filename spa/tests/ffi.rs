@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
 use pipewire_native_spa::interface::plugin::{Handle, HandleFactory};
@@ -18,11 +19,19 @@ fn test_load_log() {
         .find_factory(interface::plugin::LOG_FACTORY)
         .expect("Should find log factory");
 
+    assert!(log_factory.info().is_none());
+
     let interfaces = log_factory.enum_interface_info();
     assert_eq!(interfaces.len(), 1);
 
     let mut log_handle = log_factory
-        .init(None, None)
+        .init(
+            Some(Dict::new(vec![(
+                "log.timestamp".to_string(),
+                "local".to_string(),
+            )])),
+            None,
+        )
         .expect("Log factory loading should succeed");
 
     let log_iface = log_handle

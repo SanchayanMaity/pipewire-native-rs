@@ -4,7 +4,7 @@
 
 use std::any::Any;
 
-use crate::Dict;
+use crate::dict::Dict;
 
 pub const LOG_FACTORY: &str = "support.log";
 
@@ -17,8 +17,8 @@ pub struct InterfaceInfo {
 pub trait HandleFactory {
     /* Data fields */
     fn version(&self) -> u32;
-    fn name(&self) -> String;
-    fn info(&self) -> Dict;
+    fn name(&self) -> &str;
+    fn info(&self) -> Option<&Dict>;
 
     /* Methods */
     fn init(

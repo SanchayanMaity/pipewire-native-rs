@@ -12,7 +12,7 @@ fn test_properties_simple() {
 
     assert_eq!(props.get("key1"), Some(&"1".to_string()));
 
-    for (k, v) in props.dict() {
+    for (k, v) in props.iter() {
         assert_eq!(k, "key1");
         assert_eq!(v, "1");
     }
@@ -39,7 +39,7 @@ fn test_properties_json() {
 
     let props = Properties::new_string(conf).expect("config parsing should succeed");
 
-    assert_eq!(props.dict().keys().len(), 3);
+    assert_eq!(props.dict().items().len(), 3);
     assert_eq!(props.get("context.properties"), Some(&"{}".to_string()));
     assert_eq!(
         props.get("context.objects"),

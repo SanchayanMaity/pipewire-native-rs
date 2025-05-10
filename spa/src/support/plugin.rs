@@ -2,11 +2,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::collections::HashMap;
-
-use crate::interface::{
-    self,
-    plugin::{Handle, HandleFactory, Interface, InterfaceInfo},
+use crate::{
+    dict::Dict,
+    interface::{
+        self,
+        plugin::{Handle, HandleFactory, Interface, InterfaceInfo},
+    },
 };
 
 use super::system;
@@ -26,19 +27,15 @@ impl HandleFactory for Plugin {
         0
     }
 
-    fn name(&self) -> String {
-        "rust-support".to_string()
+    fn name(&self) -> &str {
+        "rust-support"
     }
 
-    fn info(&self) -> crate::Dict {
-        HashMap::new()
+    fn info(&self) -> Option<&Dict> {
+        None
     }
 
-    fn init(
-        &self,
-        _: Option<crate::Dict>,
-        _: Option<interface::Support>,
-    ) -> std::io::Result<impl Handle> {
+    fn init(&self, _: Option<Dict>, _: Option<interface::Support>) -> std::io::Result<impl Handle> {
         Ok(PluginHandle {})
     }
 
