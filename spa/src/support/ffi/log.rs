@@ -10,7 +10,7 @@ use crate::interface::log::{LogImpl, LogLevel};
 
 use super::{c_string, plugin::CInterface};
 
-pub struct CLogImpl {}
+struct CLogImpl {}
 
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, EnumU32)]
@@ -65,18 +65,19 @@ pub struct CLog {
     level: CLogLevel,
 }
 
-impl CLogImpl {
-    pub fn new(interface: *mut CInterface) -> LogImpl {
-        let clevel = unsafe { (interface as *mut CLog).as_ref().unwrap().level };
-        LogImpl {
-            inner: Box::new(interface as *mut CLog),
-            level: LogLevel::try_from(clevel as u32).unwrap(),
+pub fn new_impl(interface: *mut CInterface) -> LogImpl {
+    let clevel = unsafe { (interface as *mut CLog).as_ref().unwrap().level };
 
-            log: Self::log,
-            logt: Self::logt,
-        }
+    LogImpl {
+        inner: Box::new(interface as *mut CLog),
+        level: LogLevel::try_from(clevel as u32).unwrap(),
+
+        log: CLogImpl::log,
+        logt: CLogImpl::logt,
     }
+}
 
+impl CLogImpl {
     fn log(
         this: &LogImpl,
         level: crate::interface::log::LogLevel,
