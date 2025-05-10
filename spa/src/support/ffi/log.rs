@@ -62,7 +62,6 @@ pub struct CLogMethods {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct CLog {
     iface: CInterface,
     level: CLogLevel,

@@ -135,7 +135,6 @@ pub struct CCallbacks {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct CInterface {
     pub type_: *const c_char,
     pub version: u32,
@@ -143,7 +142,6 @@ pub struct CInterface {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct CHandle {
     pub version: u32,
     pub get_interface: fn(*const CHandle, *const c_char, *const *mut CInterface) -> c_int,
