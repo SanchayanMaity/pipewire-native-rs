@@ -2,14 +2,17 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use log::LogImpl;
 use r#loop::LoopImpl;
 use system::SystemImpl;
 
+pub mod log;
 pub mod r#loop;
 pub mod plugin;
 pub mod system;
 
 /* Well-known interface names */
+pub const LOG: &str = "Spa:Pointer:Interface:Log";
 pub const LOOP: &str = "Spa:Pointer:Interface:Loop";
 pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
 
@@ -17,6 +20,7 @@ pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
  * interfaces we know, to keep things less messy. If necessary, this can be replaced with a
  * HashMap<String, Any>, and we can do some coercion. */
 pub struct Support {
+    pub log: Option<LogImpl>,
     pub system: Option<SystemImpl>,
     pub loop_: Option<LoopImpl>,
 }

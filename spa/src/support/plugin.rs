@@ -2,17 +2,14 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::collections::HashMap;
 
 use crate::interface::{
     self,
     plugin::{Handle, HandleFactory, Interface, InterfaceInfo},
-    system::SystemImpl,
 };
 
 use super::system;
-
-static SYSTEM: LazyLock<SystemImpl> = LazyLock::new(|| system::new());
 
 pub struct Plugin {}
 
@@ -57,9 +54,9 @@ impl Handle for PluginHandle {
         0
     }
 
-    fn get_interface<T: Interface>(&self, type_: &str) -> Option<&'static T> {
+    fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>> {
         match type_ {
-            interface::SYSTEM => unsafe { Some(&*(&*SYSTEM as *const dyn Interface as *const T)) },
+            interface::SYSTEM => Some(Box::new(system::new())),
             _ => None,
         }
     }

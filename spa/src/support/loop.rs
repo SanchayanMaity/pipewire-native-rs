@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use std::any::Any;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::os::fd::RawFd;
@@ -17,20 +18,21 @@ use crate::interface::{
 };
 
 pub struct Loop {
-    system: Box<&'static SystemImpl>,
+    system: Box<SystemImpl>,
     pollfd: RawFd,
     sources: HashMap<RawFd, Pin<Box<Source>>>,
 }
 
 impl Loop {
     pub fn new() -> std::io::Result<LoopImpl> {
-        let system = Box::new(
-            super::plugin()
-                .init(None, None)
-                .unwrap()
-                .get_interface::<SystemImpl>(interface::SYSTEM)
-                .unwrap(),
-        );
+        let system_iface = super::plugin()
+            .init(None, None)
+            .unwrap()
+            .get_interface(interface::SYSTEM)
+            .unwrap();
+        let system = (system_iface as Box<dyn Any>)
+            .downcast::<SystemImpl>()
+            .unwrap();
         let pollfd = system.pollfd_create(system::POLLFD_CLOEXEC)?;
 
         Ok(LoopImpl {

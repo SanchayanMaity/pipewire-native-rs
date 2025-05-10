@@ -2,9 +2,13 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use std::any::Any;
+
 use crate::Dict;
 
-pub trait Interface {}
+pub const LOG_FACTORY: &str = "support.log";
+
+pub trait Interface: Any {}
 
 pub struct InterfaceInfo {
     pub type_: String,
@@ -30,6 +34,6 @@ pub trait Handle {
     fn version(&self) -> u32;
 
     /* Methods */
-    fn get_interface<T: Interface>(&self, type_: &str) -> Option<&'static T>;
+    fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>>;
     fn clear(&mut self);
 }

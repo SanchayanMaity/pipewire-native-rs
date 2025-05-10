@@ -3,24 +3,31 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::collections::HashMap;
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
+use std::ffi::{c_char, c_int, c_void, CStr};
 use std::path::PathBuf;
 
-use crate::interface::plugin::{Handle, HandleFactory, InterfaceInfo};
-use crate::interface::Support;
+use libloading::os::unix::{Library, Symbol, RTLD_NOW};
+
+use crate::interface::plugin::{Handle, HandleFactory, Interface, InterfaceInfo};
+use crate::interface::{self, Support};
+
+use super::c_string;
+use super::log::CLogImpl;
 
 const ENTRYPOINT: &str = "spa_handle_factory_enum";
+type EntryPointFn = unsafe extern "C" fn(*const *mut CHandleFactory, *mut u32) -> c_int;
 
 pub struct Plugin {
+    _library: Library,
     factories: Vec<CHandleFactory>,
 }
 
 impl Plugin {
-    pub fn find_factory(&self, name: &String) -> Option<&CHandleFactory> {
+    pub fn find_factory(&self, name: &str) -> Option<&impl HandleFactory> {
         for f in &self.factories {
             let f_name = unsafe { CStr::from_ptr(f.name).to_str() };
 
-            if f_name == Ok(name.as_str()) {
+            if f_name == Ok(name) {
                 return Some(f);
             }
         }
@@ -85,8 +92,8 @@ impl HandleFactory for CHandleFactory {
 
     fn init(
         &self,
-        info: Option<crate::Dict>,
-        support: Option<Support>,
+        _info: Option<crate::Dict>,
+        _support: Option<Support>,
     ) -> std::io::Result<impl Handle> {
         let size = (self.get_size)(self, std::ptr::null() /* FIXME: implement spa_dict */);
         let handle = unsafe { libc::malloc(size) as *mut CHandle };
@@ -99,7 +106,7 @@ impl HandleFactory for CHandleFactory {
         );
 
         match ret {
-            0 => unsafe { Ok(*handle) },
+            0 => Ok(handle),
             err => Err(std::io::Error::from_raw_os_error(err as i32)),
         }
     }
@@ -122,39 +129,55 @@ impl HandleFactory for CHandleFactory {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
+pub struct CCallbacks {
+    pub funcs: *const c_void,
+    pub data: *mut c_void,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct CInterface {
+    pub type_: *const c_char,
+    pub version: u32,
+    pub cb: CCallbacks,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
 pub struct CHandle {
     pub version: u32,
-    pub get_interface: fn(*const CHandle, *const c_char, *const *mut c_void) -> c_int,
+    pub get_interface: fn(*const CHandle, *const c_char, *const *mut CInterface) -> c_int,
     pub clear: fn(*mut CHandle) -> c_int,
 }
 
-impl Handle for CHandle {
+impl Handle for *mut CHandle {
     fn version(&self) -> u32 {
-        self.version
+        unsafe { self.as_ref().unwrap().version }
     }
 
-    fn get_interface<T: crate::interface::plugin::Interface>(
-        &self,
-        type_: &str,
-    ) -> Option<&'static T> {
-        let iface: *mut c_void = std::ptr::null_mut();
+    fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>> {
+        let iface: *mut CInterface = std::ptr::null_mut();
 
-        (self.get_interface)(self, CString::new(type_).unwrap().as_ptr(), &iface);
+        unsafe { (self.as_ref().unwrap().get_interface)(*self, c_string(type_).as_ptr(), &iface) };
 
-        None
+        match type_ {
+            interface::LOG => return Some(Box::new(CLogImpl::new(iface))),
+            _ => return None,
+        }
     }
 
     fn clear(&mut self) {
-        (self.clear)(self);
+        unsafe {
+            (self.as_ref().unwrap().clear)(*self);
+            libc::free(*self as *mut c_void);
+        }
     }
 }
 
 pub fn load(path: PathBuf) -> Result<Plugin, String> {
-    let factories = unsafe {
-        let lib = libloading::Library::new(path).map_err(|e| format!("{}", e))?;
-        let entry: libloading::Symbol<
-            unsafe extern "C" fn(*const *mut CHandleFactory, *mut u32) -> c_int,
-        > = lib
+    unsafe {
+        let library = Library::open(Some(path), RTLD_NOW).map_err(|e| format!("{}", e))?;
+        let entrypoint: Symbol<EntryPointFn> = library
             .get(ENTRYPOINT.as_bytes())
             .map_err(|e| format!("{}", e))?;
 
@@ -165,15 +188,16 @@ pub fn load(path: PathBuf) -> Result<Plugin, String> {
         let mut factories = vec![];
 
         loop {
-            match entry(h_ptr, i_ptr) {
+            match entrypoint(h_ptr, i_ptr) {
                 1 => factories.push(*h),
                 0 => break,
                 err => return Err(format!("Could not load plugin: {}", err)),
             }
         }
 
-        factories
-    };
-
-    Ok(Plugin { factories })
+        Ok(Plugin {
+            _library: library,
+            factories,
+        })
+    }
 }
