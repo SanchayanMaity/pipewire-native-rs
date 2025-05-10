@@ -41,41 +41,58 @@ impl Loop {
                 pollfd,
                 sources: HashMap::new(),
             }),
+
+            add_source: Self::add_source,
+            update_source: Self::update_source,
+            remove_source: Self::remove_source,
+            invoke: Self::invoke,
         })
     }
 }
 
-impl r#loop::Loop for Loop {
-    fn add_source(&mut self, mut source: Pin<Box<r#loop::Source>>) -> std::io::Result<i32> {
+impl Loop {
+    fn add_source(
+        this: &mut LoopImpl,
+        mut source: Pin<Box<r#loop::Source>>,
+    ) -> std::io::Result<i32> {
+        let self_ = this.inner.as_mut().downcast_mut::<Loop>().unwrap();
+
         let fd = source.fd;
         let events =
             PollEvents::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
         let data = &*source as *const Source as u64;
 
         source.rmask = 0;
-        self.sources.insert(source.fd, source);
+        self_.sources.insert(source.fd, source);
 
-        self.system.pollfd_add(self.pollfd, fd, events, data)
+        self_.system.pollfd_add(self_.pollfd, fd, events, data)
     }
 
-    fn update_source(&mut self, source: Pin<Box<r#loop::Source>>) -> std::io::Result<i32> {
+    fn update_source(
+        this: &mut LoopImpl,
+        source: Pin<Box<r#loop::Source>>,
+    ) -> std::io::Result<i32> {
+        let self_ = this.inner.as_mut().downcast_mut::<Loop>().unwrap();
+
         let fd = source.fd;
         let events =
             PollEvents::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
         let data = &*source as *const Source as u64;
 
-        self.sources.entry(source.fd).or_insert(source);
+        self_.sources.entry(source.fd).or_insert(source);
 
-        self.system.pollfd_mod(self.pollfd, fd, events, data)
+        self_.system.pollfd_mod(self_.pollfd, fd, events, data)
     }
 
-    fn remove_source(&mut self, fd: RawFd) -> std::io::Result<i32> {
-        self.system.pollfd_del(self.pollfd, fd)?;
-        self.sources.remove(&fd);
+    fn remove_source(this: &mut LoopImpl, fd: RawFd) -> std::io::Result<i32> {
+        let self_ = this.inner.as_mut().downcast_mut::<Loop>().unwrap();
+
+        self_.system.pollfd_del(self_.pollfd, fd)?;
+        self_.sources.remove(&fd);
         Ok(0)
     }
 
-    fn invoke(&mut self, func: Pin<Box<InvokeFn>>, block: bool) -> std::io::Result<i32> {
+    fn invoke(this: &mut LoopImpl, func: Pin<Box<InvokeFn>>, block: bool) -> std::io::Result<i32> {
         Err(Error::from(ErrorKind::NotFound))
     }
 }

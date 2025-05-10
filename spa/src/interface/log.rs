@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::ops::Deref;
+use std::any::Any;
 
 use super::plugin::Interface;
 
@@ -24,9 +24,41 @@ pub struct LogTopic {
 }
 
 /* TODO: need some macros to make logging less cumbersome */
-pub trait Log {
-    fn log(&self, level: LogLevel, file: &str, line: i32, func: &str, args: std::fmt::Arguments);
-    fn logt(
+pub struct LogImpl {
+    pub inner: Box<dyn Any>,
+
+    pub log: fn(
+        this: &LogImpl,
+        level: LogLevel,
+        file: &str,
+        line: i32,
+        func: &str,
+        args: std::fmt::Arguments,
+    ),
+    pub logt: fn(
+        this: &LogImpl,
+        level: LogLevel,
+        topic: &LogTopic,
+        file: &str,
+        line: i32,
+        func: &str,
+        args: std::fmt::Arguments,
+    ),
+}
+
+impl LogImpl {
+    pub fn log(
+        &self,
+        level: LogLevel,
+        file: &str,
+        line: i32,
+        func: &str,
+        args: std::fmt::Arguments,
+    ) {
+        (self.log)(self, level, file, line, func, args)
+    }
+
+    pub fn logt(
         &self,
         level: LogLevel,
         topic: &LogTopic,
@@ -34,18 +66,8 @@ pub trait Log {
         line: i32,
         func: &str,
         args: std::fmt::Arguments,
-    );
-}
-
-pub struct LogImpl {
-    pub inner: Box<dyn Log>,
-}
-
-impl Deref for LogImpl {
-    type Target = dyn Log;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner.as_ref()
+    ) {
+        (self.logt)(self, level, topic, file, line, func, args)
     }
 }
 

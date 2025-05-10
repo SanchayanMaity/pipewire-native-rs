@@ -6,13 +6,11 @@ use std::ffi::{c_char, c_int, c_void};
 
 use pipewire_native_macros::EnumU32;
 
-use crate::interface::log::{Log, LogImpl, LogLevel};
+use crate::interface::log::{LogImpl, LogLevel};
 
 use super::{c_string, plugin::CInterface};
 
-pub struct CLogImpl {
-    log: *mut CLog,
-}
+pub struct CLogImpl {}
 
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, EnumU32)]
@@ -70,16 +68,14 @@ pub struct CLog {
 impl CLogImpl {
     pub fn new(interface: *mut CInterface) -> LogImpl {
         LogImpl {
-            inner: Box::new(CLogImpl {
-                log: interface as *mut CLog,
-            }),
+            inner: Box::new(interface as *mut CLog),
+            log: Self::log,
+            logt: Self::logt,
         }
     }
-}
 
-impl Log for CLogImpl {
     fn log(
-        &self,
+        this: &LogImpl,
         level: crate::interface::log::LogLevel,
         file: &str,
         line: i32,
@@ -93,7 +89,13 @@ impl Log for CLogImpl {
         };
 
         unsafe {
-            let log = self.log.as_ref().unwrap();
+            let log = this
+                .inner
+                .as_ref()
+                .downcast_ref::<*mut CLog>()
+                .unwrap()
+                .as_ref()
+                .unwrap();
             let funcs = log.iface.cb.funcs as *const CLogMethods;
             ((*funcs).log)(
                 log.iface.cb.data,
@@ -107,7 +109,7 @@ impl Log for CLogImpl {
     }
 
     fn logt(
-        &self,
+        this: &LogImpl,
         level: LogLevel,
         topic: &crate::interface::log::LogTopic,
         file: &str,
@@ -129,7 +131,13 @@ impl Log for CLogImpl {
         };
 
         unsafe {
-            let log = self.log.as_ref().unwrap();
+            let log = this
+                .inner
+                .as_ref()
+                .downcast_ref::<*mut CLog>()
+                .unwrap()
+                .as_ref()
+                .unwrap();
             let funcs = log.iface.cb.funcs as *const CLogMethods;
 
             ((*funcs).logt)(

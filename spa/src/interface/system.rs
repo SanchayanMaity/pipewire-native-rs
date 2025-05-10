@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{ops::Deref, os::fd::RawFd};
+use std::{any::Any, os::fd::RawFd};
 
 use bitflags::bitflags;
 
@@ -34,48 +34,69 @@ bitflags! {
     }
 }
 
-pub trait System {
-    fn pollfd_create(&self, flags: i32) -> std::io::Result<i32>;
-    fn pollfd_add(
+pub struct SystemImpl {
+    pub inner: Box<dyn Any>,
+
+    pub pollfd_create: fn(this: &SystemImpl, flags: i32) -> std::io::Result<i32>,
+    pub pollfd_add: fn(
+        this: &SystemImpl,
+        pfd: RawFd,
+        fd: RawFd,
+        events: PollEvents,
+        data: u64,
+    ) -> std::io::Result<i32>,
+    pub pollfd_mod: fn(
+        this: &SystemImpl,
+        pfd: RawFd,
+        fd: RawFd,
+        events: PollEvents,
+        data: u64,
+    ) -> std::io::Result<i32>,
+    pub pollfd_del: fn(this: &SystemImpl, pfd: RawFd, fd: RawFd) -> std::io::Result<i32>,
+    pub pollfd_wait: fn(
+        this: &SystemImpl,
+        pfd: RawFd,
+        events: &mut [PollEvent],
+        timeout: i32,
+    ) -> std::io::Result<i32>,
+}
+
+impl SystemImpl {
+    pub fn pollfd_create(&self, flags: i32) -> std::io::Result<i32> {
+        (self.pollfd_create)(self, flags)
+    }
+
+    pub fn pollfd_add(
         &self,
         pfd: RawFd,
         fd: RawFd,
         events: PollEvents,
         data: u64,
-    ) -> std::io::Result<i32>;
-    fn pollfd_mod(
+    ) -> std::io::Result<i32> {
+        (self.pollfd_add)(self, pfd, fd, events, data)
+    }
+
+    pub fn pollfd_mod(
         &self,
         pfd: RawFd,
         fd: RawFd,
         events: PollEvents,
         data: u64,
-    ) -> std::io::Result<i32>;
-    fn pollfd_del(&self, pfd: RawFd, fd: RawFd) -> std::io::Result<i32>;
-    fn pollfd_wait(
+    ) -> std::io::Result<i32> {
+        (self.pollfd_mod)(self, pfd, fd, events, data)
+    }
+
+    pub fn pollfd_del(&self, pfd: RawFd, fd: RawFd) -> std::io::Result<i32> {
+        (self.pollfd_del)(self, pfd, fd)
+    }
+
+    pub fn pollfd_wait(
         &self,
         pfd: RawFd,
         events: &mut [PollEvent],
         timeout: i32,
-    ) -> std::io::Result<i32>;
-}
-
-pub struct SystemImpl {
-    inner: Box<dyn System>,
-}
-
-impl SystemImpl {
-    pub fn new(system: impl System + 'static) -> SystemImpl {
-        SystemImpl {
-            inner: Box::new(system),
-        }
-    }
-}
-
-impl Deref for SystemImpl {
-    type Target = dyn System;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner.as_ref()
+    ) -> std::io::Result<i32> {
+        (self.pollfd_wait)(self, pfd, events, timeout)
     }
 }
 

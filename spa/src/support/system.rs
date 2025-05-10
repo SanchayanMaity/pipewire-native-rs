@@ -4,12 +4,20 @@
 
 use std::{io::Error, os::fd::RawFd};
 
-use crate::interface::system::{self, PollEvent, PollEvents, SystemImpl};
+use crate::interface::system::{PollEvent, PollEvents, SystemImpl};
 
 struct System {}
 
 pub fn new() -> SystemImpl {
-    SystemImpl::new(System {})
+    SystemImpl {
+        inner: Box::new(System {}),
+
+        pollfd_create: System::pollfd_create,
+        pollfd_add: System::pollfd_add,
+        pollfd_mod: System::pollfd_mod,
+        pollfd_del: System::pollfd_del,
+        pollfd_wait: System::pollfd_wait,
+    }
 }
 
 fn result_or_error(res: i32) -> std::io::Result<i32> {
@@ -20,14 +28,14 @@ fn result_or_error(res: i32) -> std::io::Result<i32> {
     }
 }
 
-impl system::System for System {
-    fn pollfd_create(&self, flags: i32) -> std::io::Result<i32> {
+impl System {
+    fn pollfd_create(_this: &SystemImpl, flags: i32) -> std::io::Result<i32> {
         let res = unsafe { libc::epoll_create1(flags) };
         result_or_error(res)
     }
 
     fn pollfd_add(
-        &self,
+        _this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
         events: PollEvents,
@@ -49,7 +57,7 @@ impl system::System for System {
     }
 
     fn pollfd_mod(
-        &self,
+        _this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
         events: PollEvents,
@@ -70,7 +78,7 @@ impl system::System for System {
         result_or_error(res)
     }
 
-    fn pollfd_del(&self, pfd: RawFd, fd: RawFd) -> std::io::Result<i32> {
+    fn pollfd_del(_this: &SystemImpl, pfd: RawFd, fd: RawFd) -> std::io::Result<i32> {
         let res = unsafe {
             libc::epoll_ctl(
                 pfd,
@@ -83,7 +91,7 @@ impl system::System for System {
     }
 
     fn pollfd_wait(
-        &self,
+        _this: &SystemImpl,
         pfd: RawFd,
         events: &mut [PollEvent],
         timeout: i32,
