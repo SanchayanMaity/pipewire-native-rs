@@ -12,8 +12,6 @@ use crate::interface::log::{LogImpl, LogLevel, LogTopic};
 
 use super::{c_string, plugin::CInterface};
 
-struct CLogImpl {}
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct CLogTopic {
@@ -55,6 +53,8 @@ struct CLog {
     iface: CInterface,
     level: LogLevel,
 }
+
+struct CLogImpl {}
 
 pub fn new_impl(interface: *mut CInterface) -> LogImpl {
     let level = unsafe { (interface as *mut CLog).as_ref().unwrap().level };
