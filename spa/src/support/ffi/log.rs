@@ -41,23 +41,23 @@ pub struct CLogTopic {
 pub struct CLogMethods {
     version: u32,
     log: extern "C" fn(
-        *mut c_void,
-        CLogLevel,
-        *const c_char,
-        c_int,
-        *const c_char,
-        *const c_char,
+        object: *mut c_void,
+        level: CLogLevel,
+        file: *const c_char,
+        line: c_int,
+        func: *const c_char,
+        fmt: *const c_char,
         ...
     ),
     logv: *const c_void, /* va_list currently only in nightly */
     logt: extern "C" fn(
-        *mut c_void,
-        CLogLevel,
-        *const CLogTopic,
-        *const c_char,
-        c_int,
-        *const c_char,
-        *const c_char,
+        object: *mut c_void,
+        level: CLogLevel,
+        topic: *const CLogTopic,
+        file: *const c_char,
+        line: c_int,
+        func: *const c_char,
+        fmt: *const c_char,
         ...
     ),
     logtv: *const c_void, /* va_list currently only in nightly */
