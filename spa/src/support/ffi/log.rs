@@ -8,41 +8,28 @@ use std::{
     pin::Pin,
 };
 
-use pipewire_native_macros::EnumU32;
-
 use crate::interface::log::{LogImpl, LogLevel, LogTopic};
 
 use super::{c_string, plugin::CInterface};
 
 struct CLogImpl {}
 
-#[repr(u32)]
-#[derive(Copy, Clone, Debug, EnumU32)]
-pub enum CLogLevel {
-    None = 0,
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
-}
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct CLogTopic {
+struct CLogTopic {
     version: u32,
     topic: *const c_char,
-    level: CLogLevel,
+    level: LogLevel,
     has_custom_level: bool,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct CLogMethods {
+struct CLogMethods {
     version: u32,
     log: extern "C" fn(
         object: *mut c_void,
-        level: CLogLevel,
+        level: LogLevel,
         file: *const c_char,
         line: c_int,
         func: *const c_char,
@@ -52,7 +39,7 @@ pub struct CLogMethods {
     logv: *const c_void, /* va_list currently only in nightly */
     logt: extern "C" fn(
         object: *mut c_void,
-        level: CLogLevel,
+        level: LogLevel,
         topic: *const CLogTopic,
         file: *const c_char,
         line: c_int,
@@ -64,17 +51,17 @@ pub struct CLogMethods {
 }
 
 #[repr(C)]
-pub struct CLog {
+struct CLog {
     iface: CInterface,
-    level: CLogLevel,
+    level: LogLevel,
 }
 
 pub fn new_impl(interface: *mut CInterface) -> LogImpl {
-    let clevel = unsafe { (interface as *mut CLog).as_ref().unwrap().level };
+    let level = unsafe { (interface as *mut CLog).as_ref().unwrap().level };
 
     LogImpl {
         inner: Box::pin(interface as *mut CLog),
-        level: LogLevel::try_from(clevel as u32).unwrap(),
+        level,
 
         log: CLogImpl::log,
         logt: CLogImpl::logt,
@@ -82,14 +69,14 @@ pub fn new_impl(interface: *mut CInterface) -> LogImpl {
 }
 
 extern "C" {
-    fn c_log_from_impl(impl_: *const c_void, level: CLogLevel) -> *mut CLog;
+    fn c_log_from_impl(impl_: *const c_void, level: LogLevel) -> *mut CLog;
     fn c_log_free(log: *mut CLog);
 }
 
 #[no_mangle]
-pub extern "C" fn rust_logt(
+extern "C" fn rust_logt(
     impl_: *mut c_void,
-    level: CLogLevel,
+    level: LogLevel,
     topic: *const CLogTopic,
     file: *const c_char,
     line: i32,
@@ -121,9 +108,8 @@ pub extern "C" fn rust_logt(
 pub fn make_native(log: &LogImpl) -> *mut CInterface {
     unsafe {
         let inner = Pin::into_inner_unchecked(log.inner.as_ref());
-        let level = CLogLevel::try_from(log.level as u32).unwrap();
 
-        c_log_from_impl(inner as *const dyn Any as *const c_void, level) as *mut CInterface
+        c_log_from_impl(inner as *const dyn Any as *const c_void, log.level) as *mut CInterface
     }
 }
 
@@ -142,7 +128,6 @@ impl CLogImpl {
         func: &str,
         args: std::fmt::Arguments,
     ) {
-        let clevel = CLogLevel::try_from(level as u32).unwrap();
         let log_line = match args.as_str() {
             Some(s) => s,
             _ => return,
@@ -159,7 +144,7 @@ impl CLogImpl {
             let funcs = log.iface.cb.funcs as *const CLogMethods;
             ((*funcs).log)(
                 log.iface.cb.data,
-                clevel,
+                level,
                 c_string(file).as_ptr(),
                 line,
                 c_string(func).as_ptr(),
@@ -177,12 +162,11 @@ impl CLogImpl {
         func: &str,
         args: std::fmt::Arguments,
     ) {
-        let clevel = CLogLevel::try_from(level as u32).unwrap();
         let topic_name = c_string(topic.topic.as_str());
         let ctopic = CLogTopic {
             version: 0,
             topic: topic_name.as_ptr(),
-            level: CLogLevel::try_from(topic.level as u32).unwrap(),
+            level,
             has_custom_level: topic.has_custom_level,
         };
         let log_line = match args.as_str() {
@@ -202,7 +186,7 @@ impl CLogImpl {
 
             ((*funcs).logt)(
                 log.iface.cb.data,
-                clevel,
+                level,
                 &ctopic,
                 c_string(file).as_ptr(),
                 line,
