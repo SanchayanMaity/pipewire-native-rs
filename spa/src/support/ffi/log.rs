@@ -2,11 +2,15 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::ffi::{c_char, c_int, c_void};
+use std::{
+    any::Any,
+    ffi::{c_char, c_int, c_void, CStr},
+    pin::Pin,
+};
 
 use pipewire_native_macros::EnumU32;
 
-use crate::interface::log::{LogImpl, LogLevel};
+use crate::interface::log::{LogImpl, LogLevel, LogTopic};
 
 use super::{c_string, plugin::CInterface};
 
@@ -74,6 +78,58 @@ pub fn new_impl(interface: *mut CInterface) -> LogImpl {
 
         log: CLogImpl::log,
         logt: CLogImpl::logt,
+    }
+}
+
+extern "C" {
+    fn c_log_from_impl(impl_: *const c_void, level: CLogLevel) -> *mut CLog;
+    fn c_log_free(log: *mut CLog);
+}
+
+#[no_mangle]
+pub extern "C" fn rust_logt(
+    impl_: *mut c_void,
+    level: CLogLevel,
+    topic: *const CLogTopic,
+    file: *const c_char,
+    line: i32,
+    func: *const c_char,
+    log: *const c_char,
+) {
+    let log_impl: Pin<Box<LogImpl>> =
+        unsafe { Box::into_pin(Box::from_raw(impl_ as *mut LogImpl)) };
+    let level = LogLevel::try_from(level as u32).unwrap();
+    let file = unsafe { CStr::from_ptr(file).to_str().unwrap() };
+    let func = unsafe { CStr::from_ptr(func).to_str().unwrap() };
+    let log = unsafe { CStr::from_ptr(log).to_str().unwrap() };
+
+    if topic == std::ptr::null() {
+        log_impl.log(level, file, line, func, format_args!("{}", log));
+    } else {
+        let topic = unsafe {
+            let c_topic = &*topic;
+            LogTopic {
+                topic: CStr::from_ptr(c_topic.topic).to_str().unwrap().to_string(),
+                level: LogLevel::try_from(c_topic.level as u32).unwrap(),
+                has_custom_level: c_topic.has_custom_level,
+            }
+        };
+        log_impl.logt(level, &topic, file, line, func, format_args!("{}", log));
+    }
+}
+
+pub fn make_native(log: &LogImpl) -> *mut CInterface {
+    unsafe {
+        let inner = Pin::into_inner_unchecked(log.inner.as_ref());
+        let level = CLogLevel::try_from(log.level as u32).unwrap();
+
+        c_log_from_impl(inner as *const dyn Any as *const c_void, level) as *mut CInterface
+    }
+}
+
+pub fn free_native(c_log: *mut CInterface) {
+    unsafe {
+        c_log_free(c_log as *mut CLog);
     }
 }
 
