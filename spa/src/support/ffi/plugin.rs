@@ -59,10 +59,19 @@ pub struct CHandleFactory {
     pub name: *const c_char,
     pub info: *const Dict,
 
-    pub get_size: fn(*const CHandleFactory, *const Dict) -> usize,
-    pub init: fn(*const CHandleFactory, *mut CHandle, *const Dict, *const c_void, u32) -> c_int,
-    pub enum_interface_info:
-        fn(*const CHandleFactory, *const *mut CInterfaceInfo, *mut u32) -> c_int,
+    pub get_size: fn(factory: *const CHandleFactory, params: *const Dict) -> usize,
+    pub init: fn(
+        factory: *const CHandleFactory,
+        handle: *mut CHandle,
+        params: *const Dict,
+        support: *const CSupport,
+        n_support: u32,
+    ) -> c_int,
+    pub enum_interface_info: fn(
+        factory: *const CHandleFactory,
+        info: *const *mut CInterfaceInfo,
+        index: *mut u32,
+    ) -> c_int,
 }
 
 impl HandleFactory for *mut CHandleFactory {
@@ -140,8 +149,9 @@ pub struct CInterface {
 #[repr(C)]
 pub struct CHandle {
     pub version: u32,
-    pub get_interface: fn(*const CHandle, *const c_char, *const *mut CInterface) -> c_int,
-    pub clear: fn(*mut CHandle) -> c_int,
+    pub get_interface:
+        fn(handle: *const CHandle, type_: *const c_char, iface: *const *mut CInterface) -> c_int,
+    pub clear: fn(handle: *mut CHandle) -> c_int,
 }
 
 impl Handle for *mut CHandle {
