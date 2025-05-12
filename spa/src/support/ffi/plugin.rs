@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use libloading::os::unix::{Library, Symbol, RTLD_NOW};
 
 use crate::dict::Dict;
+use crate::interface::ffi::{CInterface, CSupport};
 use crate::interface::plugin::{Handle, HandleFactory, Interface, InterfaceInfo};
 use crate::interface::{self, Support};
 
@@ -91,7 +92,7 @@ impl HandleFactory for *mut CHandleFactory {
         unsafe { self.as_ref().unwrap().info.as_ref() }
     }
 
-    fn init(&self, info: Option<Dict>, _support: Option<Support>) -> std::io::Result<impl Handle> {
+    fn init(&self, info: Option<Dict>, support: Option<Support>) -> std::io::Result<impl Handle> {
         unsafe {
             let info_ptr = match &info {
                 Some(i) => i.as_raw(),
@@ -99,13 +100,15 @@ impl HandleFactory for *mut CHandleFactory {
             };
             let size = (self.as_ref().unwrap().get_size)(*self, info_ptr);
             let handle = libc::malloc(size) as *mut CHandle;
-            let ret = (self.as_ref().unwrap().init)(
-                *self,
-                handle,
-                info_ptr,
-                std::ptr::null(), /* FIXME: implement Support -> spa_supoprt */
-                0,
-            );
+            let (support, n_support) = match support {
+                None => (std::ptr::null(), 0),
+                Some(s) => {
+                    let all = s.all();
+                    (all.as_ptr(), all.len())
+                }
+            };
+            let ret =
+                (self.as_ref().unwrap().init)(*self, handle, info_ptr, support, n_support as u32);
 
             match ret {
                 0 => Ok(handle),
@@ -130,20 +133,6 @@ impl HandleFactory for *mut CHandleFactory {
             }
         }
     }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct CCallbacks {
-    pub funcs: *const c_void,
-    pub data: *mut c_void,
-}
-
-#[repr(C)]
-pub struct CInterface {
-    pub type_: *const c_char,
-    pub version: u32,
-    pub cb: CCallbacks,
 }
 
 #[repr(C)]

@@ -8,6 +8,6 @@ pub mod log;
 pub mod plugin;
 
 /* TODO: can we avoid an allocation here? */
-fn c_string(s: &str) -> CString {
+pub fn c_string(s: &str) -> CString {
     CString::new(s).expect("&str should wrap as CString")
 }

@@ -8,9 +8,10 @@ use std::{
     pin::Pin,
 };
 
+use crate::interface::ffi::CInterface;
 use crate::interface::log::{LogImpl, LogLevel, LogTopic};
 
-use super::{c_string, plugin::CInterface};
+use super::c_string;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -108,7 +109,6 @@ extern "C" fn rust_logt(
 pub fn make_native(log: &LogImpl) -> *mut CInterface {
     unsafe {
         let inner = Pin::into_inner_unchecked(log.inner.as_ref());
-
         c_log_from_impl(inner as *const dyn Any as *const c_void, log.level) as *mut CInterface
     }
 }
