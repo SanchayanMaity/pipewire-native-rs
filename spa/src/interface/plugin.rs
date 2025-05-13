@@ -24,8 +24,8 @@ pub trait HandleFactory {
     fn init(
         &self,
         info: Option<Dict>,
-        support: Option<super::Support>,
-    ) -> std::io::Result<impl Handle>;
+        support: &super::Support,
+    ) -> std::io::Result<Box<dyn Handle>>;
     fn enum_interface_info(&self) -> Vec<InterfaceInfo>;
 }
 

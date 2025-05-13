@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::ffi::{c_void, CStr, CString};
+use std::{
+    ffi::{c_void, CStr, CString},
+    pin::Pin,
+};
 
 use ffi::{CInterface, CSupport};
 use log::LogImpl;
@@ -23,9 +26,9 @@ pub const LOOP: &str = "Spa:Pointer:Interface:Loop";
 pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
 
 pub struct Support {
-    log: Option<LogImpl>,
-    system: Option<SystemImpl>,
-    loop_: Option<LoopImpl>,
+    log: Option<Pin<Box<LogImpl>>>,
+    system: Option<Pin<Box<SystemImpl>>>,
+    loop_: Option<Pin<Box<LoopImpl>>>,
     /* We keep a C-compatible array that won't get moved around, so we can reliably pass it on to
      * plugins */
     all: Vec<CSupport>,
@@ -61,9 +64,20 @@ impl Support {
         });
     }
 
-    pub fn set_log(&mut self, log: LogImpl) {
-        self.add_or_update(LOG, support::ffi::log::make_native(&log));
-        self.log = Some(log);
+    pub fn set_log(&mut self, log: Box<LogImpl>) {
+        self.log = Some(Pin::new(log));
+        self.add_or_update(
+            LOG,
+            support::ffi::log::make_native(self.log.as_ref().unwrap()),
+        );
+    }
+
+    pub fn set_system(&mut self, system: Box<SystemImpl>) {
+        self.system = Some(Pin::new(system));
+        //self.add_or_update(
+        //    SYSTEM,
+        //    support::ffi::system::make_native(self.system.as_ref().unwrap()),
+        //);
     }
 }
 

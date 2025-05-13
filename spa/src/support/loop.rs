@@ -9,7 +9,7 @@ use std::os::fd::RawFd;
 use std::pin::Pin;
 
 use crate::interface;
-use crate::interface::plugin::{Handle, HandleFactory};
+use crate::interface::plugin::HandleFactory;
 use crate::interface::r#loop::LoopImpl;
 use crate::interface::system::SystemImpl;
 use crate::interface::{
@@ -24,9 +24,9 @@ pub struct Loop {
 }
 
 impl Loop {
-    pub fn new() -> std::io::Result<LoopImpl> {
+    pub fn new(support: &interface::Support) -> std::io::Result<LoopImpl> {
         let system_iface = super::plugin()
-            .init(None, None)
+            .init(None, support)
             .unwrap()
             .get_interface(interface::SYSTEM)
             .unwrap();

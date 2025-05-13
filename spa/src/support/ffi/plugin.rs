@@ -24,7 +24,7 @@ pub struct Plugin {
 }
 
 impl Plugin {
-    pub fn find_factory(&self, name: &str) -> Option<impl HandleFactory> {
+    pub fn find_factory(&self, name: &str) -> Option<Box<dyn HandleFactory>> {
         for f in &self.factories {
             let f_name = unsafe {
                 let factory = f.as_ref().unwrap();
@@ -32,7 +32,7 @@ impl Plugin {
             };
 
             if f_name == Ok(name) {
-                return Some(CHandleFactoryImpl { factory: *f });
+                return Some(Box::new(CHandleFactoryImpl { factory: *f }));
             }
         }
 
@@ -96,7 +96,7 @@ impl HandleFactory for CHandleFactoryImpl {
         unsafe { self.factory.as_ref().unwrap().info.as_ref() }
     }
 
-    fn init(&self, info: Option<Dict>, support: Option<Support>) -> std::io::Result<impl Handle> {
+    fn init(&self, info: Option<Dict>, support: &Support) -> std::io::Result<Box<dyn Handle>> {
         unsafe {
             let info_ptr = match &info {
                 Some(i) => i.as_raw(),
@@ -104,12 +104,9 @@ impl HandleFactory for CHandleFactoryImpl {
             };
             let size = (self.factory.as_ref().unwrap().get_size)(self.factory, info_ptr);
             let handle = libc::malloc(size) as *mut CHandle;
-            let (support, n_support) = match support {
-                None => (std::ptr::null(), 0),
-                Some(s) => {
-                    let all = s.all();
-                    (all.as_ptr(), all.len())
-                }
+            let (support, n_support) = {
+                let all = support.all();
+                (all.as_ptr(), all.len())
             };
             let ret = (self.factory.as_ref().unwrap().init)(
                 self.factory,
@@ -120,7 +117,7 @@ impl HandleFactory for CHandleFactoryImpl {
             );
 
             match ret {
-                0 => Ok(CHandleImpl { handle }),
+                0 => Ok(Box::new(CHandleImpl { handle })),
                 err => Err(std::io::Error::from_raw_os_error(err as i32)),
             }
         }

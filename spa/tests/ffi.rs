@@ -9,7 +9,9 @@ use pipewire_native_spa::interface::plugin::{Handle, HandleFactory};
 use pipewire_native_spa::support::ffi;
 
 #[test]
-fn test_load_log() {
+fn test_load_support() {
+    let mut support = interface::Support::new();
+
     let plugin_path = std::env::var("SPA_TEST_PLUGIN_PATH")
         .unwrap_or("/usr/lib64/spa-0.2/support/libspa-support.so".to_string());
 
@@ -24,13 +26,13 @@ fn test_load_log() {
     let interfaces = log_factory.enum_interface_info();
     assert_eq!(interfaces.len(), 1);
 
-    let mut log_handle = log_factory
+    let log_handle = log_factory
         .init(
-            Some(Dict::new(vec![(
-                "log.timestamp".to_string(),
-                "local".to_string(),
-            )])),
-            None,
+            Some(Dict::new(vec![
+                ("log.timestamp".to_string(), "local".to_string()),
+                ("log.level".to_string(), "7".to_string()),
+            ])),
+            &support,
         )
         .expect("Log factory loading should succeed");
 
