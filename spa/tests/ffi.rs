@@ -5,6 +5,7 @@
 use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
+use pipewire_native_spa::interface::plugin::{Handle, HandleFactory};
 use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
 

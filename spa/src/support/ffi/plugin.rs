@@ -25,7 +25,7 @@ pub struct Plugin {
 }
 
 impl Plugin {
-    pub fn find_factory(&self, name: &str) -> Option<Box<dyn HandleFactory>> {
+    pub fn find_factory(&self, name: &str) -> Option<impl HandleFactory + 'static> {
         for f in &self.factories {
             let f_name = unsafe {
                 let factory = f.as_ref().unwrap();
@@ -33,7 +33,7 @@ impl Plugin {
             };
 
             if f_name == Ok(name) {
-                return Some(Box::new(CHandleFactoryImpl { factory: *f }));
+                return Some(CHandleFactoryImpl { factory: *f });
             }
         }
 
@@ -97,7 +97,11 @@ impl HandleFactory for CHandleFactoryImpl {
         unsafe { self.factory.as_ref().unwrap().info.as_ref() }
     }
 
-    fn init(&self, info: Option<Dict>, support: &Support) -> std::io::Result<Box<dyn Handle>> {
+    fn init(
+        &self,
+        info: Option<Dict>,
+        support: &Support,
+    ) -> std::io::Result<impl Handle + 'static> {
         unsafe {
             let info_ptr = match &info {
                 Some(i) => i.as_raw(),
@@ -118,7 +122,7 @@ impl HandleFactory for CHandleFactoryImpl {
             );
 
             match ret {
-                0 => Ok(Box::new(CHandleImpl { handle })),
+                0 => Ok(CHandleImpl { handle }),
                 err => Err(std::io::Error::from_raw_os_error(err as i32)),
             }
         }
