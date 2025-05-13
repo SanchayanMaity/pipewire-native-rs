@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <sys/ioctl.h>
 
-int impl_ioctl(void *object, int fd, unsigned long request, ...)
+int impl_ioctl(void *object __attribute__((unused)), int fd, unsigned long request, ...)
 {
 	va_list args;
 	long arg;
@@ -13,7 +13,7 @@ int impl_ioctl(void *object, int fd, unsigned long request, ...)
 
 	va_start(args, request);
 	arg = va_arg(args, long);
-	ret = ioctl(fd, request, args);
+	ret = ioctl(fd, request, arg);
 	va_end(args);
 
 	return ret;
