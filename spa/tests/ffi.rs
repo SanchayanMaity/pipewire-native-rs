@@ -50,5 +50,4 @@ fn test_load_log() {
         format_args!("log test: {}", "some format"),
     );
 
-    log_handle.clear();
 }

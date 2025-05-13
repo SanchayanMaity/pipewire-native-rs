@@ -57,6 +57,4 @@ impl Handle for PluginHandle {
             _ => None,
         }
     }
-
-    fn clear(&mut self) {}
 }

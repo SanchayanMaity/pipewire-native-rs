@@ -35,5 +35,4 @@ pub trait Handle {
 
     /* Methods */
     fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>>;
-    fn clear(&mut self);
 }

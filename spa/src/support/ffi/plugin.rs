@@ -24,7 +24,7 @@ pub struct Plugin {
 }
 
 impl Plugin {
-    pub fn find_factory(&self, name: &str) -> Option<&impl HandleFactory> {
+    pub fn find_factory(&self, name: &str) -> Option<impl HandleFactory> {
         for f in &self.factories {
             let f_name = unsafe {
                 let factory = f.as_ref().unwrap();
@@ -32,7 +32,7 @@ impl Plugin {
             };
 
             if f_name == Ok(name) {
-                return Some(f);
+                return Some(CHandleFactoryImpl { factory: *f });
             }
         }
 
@@ -75,21 +75,25 @@ pub struct CHandleFactory {
     ) -> c_int,
 }
 
-impl HandleFactory for *mut CHandleFactory {
+struct CHandleFactoryImpl {
+    factory: *mut CHandleFactory,
+}
+
+impl HandleFactory for CHandleFactoryImpl {
     fn version(&self) -> u32 {
-        unsafe { self.as_ref().unwrap().version }
+        unsafe { self.factory.as_ref().unwrap().version }
     }
 
     fn name(&self) -> &str {
         unsafe {
-            CStr::from_ptr(self.as_ref().unwrap().name)
+            CStr::from_ptr(self.factory.as_ref().unwrap().name)
                 .to_str()
                 .unwrap()
         }
     }
 
     fn info(&self) -> Option<&Dict> {
-        unsafe { self.as_ref().unwrap().info.as_ref() }
+        unsafe { self.factory.as_ref().unwrap().info.as_ref() }
     }
 
     fn init(&self, info: Option<Dict>, support: Option<Support>) -> std::io::Result<impl Handle> {
@@ -98,7 +102,7 @@ impl HandleFactory for *mut CHandleFactory {
                 Some(i) => i.as_raw(),
                 None => std::ptr::null(),
             };
-            let size = (self.as_ref().unwrap().get_size)(*self, info_ptr);
+            let size = (self.factory.as_ref().unwrap().get_size)(self.factory, info_ptr);
             let handle = libc::malloc(size) as *mut CHandle;
             let (support, n_support) = match support {
                 None => (std::ptr::null(), 0),
@@ -107,11 +111,16 @@ impl HandleFactory for *mut CHandleFactory {
                     (all.as_ptr(), all.len())
                 }
             };
-            let ret =
-                (self.as_ref().unwrap().init)(*self, handle, info_ptr, support, n_support as u32);
+            let ret = (self.factory.as_ref().unwrap().init)(
+                self.factory,
+                handle,
+                info_ptr,
+                support,
+                n_support as u32,
+            );
 
             match ret {
-                0 => Ok(handle),
+                0 => Ok(CHandleImpl { handle }),
                 err => Err(std::io::Error::from_raw_os_error(err as i32)),
             }
         }
@@ -124,7 +133,11 @@ impl HandleFactory for *mut CHandleFactory {
 
         loop {
             unsafe {
-                match (self.as_ref().unwrap().enum_interface_info)(*self, &info, &mut i) {
+                match (self.factory.as_ref().unwrap().enum_interface_info)(
+                    self.factory,
+                    &info,
+                    &mut i,
+                ) {
                     1 => interfaces.push(InterfaceInfo {
                         type_: CStr::from_ptr((*info).type_).to_string_lossy().to_string(),
                     }),
@@ -143,26 +156,38 @@ pub struct CHandle {
     pub clear: fn(handle: *mut CHandle) -> c_int,
 }
 
-impl Handle for *mut CHandle {
+struct CHandleImpl {
+    handle: *mut CHandle,
+}
+
+impl Drop for CHandleImpl {
+    fn drop(&mut self) {
+        unsafe {
+            (self.handle.as_ref().unwrap().clear)(self.handle);
+            libc::free(self.handle as *mut c_void);
+        }
+    }
+}
+
+impl Handle for CHandleImpl {
     fn version(&self) -> u32 {
-        unsafe { self.as_ref().unwrap().version }
+        unsafe { self.handle.as_ref().unwrap().version }
     }
 
     fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>> {
         let iface: *mut CInterface = std::ptr::null_mut();
 
-        unsafe { (self.as_ref().unwrap().get_interface)(*self, c_string(type_).as_ptr(), &iface) };
+        unsafe {
+            (self.handle.as_ref().unwrap().get_interface)(
+                self.handle,
+                c_string(type_).as_ptr(),
+                &iface,
+            )
+        };
 
         match type_ {
             interface::LOG => return Some(Box::new(log::new_impl(iface))),
             _ => return None,
-        }
-    }
-
-    fn clear(&mut self) {
-        unsafe {
-            (self.as_ref().unwrap().clear)(*self);
-            libc::free(*self as *mut c_void);
         }
     }
 }
