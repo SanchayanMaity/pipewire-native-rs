@@ -4,7 +4,7 @@
 
 use std::{
     any::Any,
-    ffi::{c_char, c_int, c_void, CStr},
+    ffi::{c_char, c_int, c_void, CStr, CString},
     pin::Pin,
 };
 
@@ -84,8 +84,7 @@ extern "C" fn rust_logt(
     func: *const c_char,
     log: *const c_char,
 ) {
-    let log_impl: Pin<Box<LogImpl>> =
-        unsafe { Box::into_pin(Box::from_raw(impl_ as *mut LogImpl)) };
+    let log_impl = unsafe { &mut *(impl_ as *mut LogImpl) };
     let level = LogLevel::try_from(level as u32).unwrap();
     let file = unsafe { CStr::from_ptr(file).to_str().unwrap() };
     let func = unsafe { CStr::from_ptr(func).to_str().unwrap() };
@@ -107,10 +106,7 @@ extern "C" fn rust_logt(
 }
 
 pub fn make_native(log: &LogImpl) -> *mut CInterface {
-    unsafe {
-        let inner = Pin::into_inner_unchecked(log.inner.as_ref());
-        c_log_from_impl(inner as *const dyn Any as *const c_void, log.level) as *mut CInterface
-    }
+    unsafe { c_log_from_impl(log as *const dyn Any as *const c_void, log.level) as *mut CInterface }
 }
 
 pub fn free_native(c_log: *mut CInterface) {
@@ -169,10 +165,10 @@ impl CLogImpl {
             level,
             has_custom_level: topic.has_custom_level,
         };
-        let log_line = match args.as_str() {
-            Some(s) => s,
-            _ => return,
-        };
+        let log_line = args
+            .as_str()
+            .map(|s| c_string(s))
+            .unwrap_or(CString::new(args.to_string()).unwrap());
 
         unsafe {
             let log = this
@@ -191,7 +187,7 @@ impl CLogImpl {
                 c_string(file).as_ptr(),
                 line,
                 c_string(func).as_ptr(),
-                c_string(log_line).as_ptr(),
+                log_line.as_ptr(),
             )
         };
     }
