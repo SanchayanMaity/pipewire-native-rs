@@ -17,6 +17,7 @@ pub struct PollEvent {
 pub const POLLFD_CLOEXEC: i32 = libc::EPOLL_CLOEXEC;
 
 bitflags! {
+    #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct PollEvents: u32 {
         /* Events */
@@ -31,6 +32,14 @@ bitflags! {
         const ONESHOT = libc::EPOLLONESHOT as u32;
         const WAKEUP = libc::EPOLLWAKEUP as u32;
         const EXCLUSIVE = libc::EPOLLEXCLUSIVE as u32;
+    }
+}
+
+pub fn result_or_error(res: i32) -> std::io::Result<i32> {
+    if res >= 0 {
+        Ok(res)
+    } else {
+        Err(std::io::Error::last_os_error())
     }
 }
 

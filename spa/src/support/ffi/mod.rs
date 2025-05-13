@@ -6,6 +6,7 @@ use std::ffi::CString;
 
 pub mod log;
 pub mod plugin;
+pub mod system;
 
 /* TODO: can we avoid an allocation here? */
 pub fn c_string(s: &str) -> CString {

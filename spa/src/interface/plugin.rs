@@ -7,6 +7,7 @@ use std::any::Any;
 use crate::dict::Dict;
 
 pub const LOG_FACTORY: &str = "support.log";
+pub const SYSTEM_FACTORY: &str = "support.system";
 
 pub trait Interface: Any {}
 

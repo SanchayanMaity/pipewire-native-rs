@@ -14,6 +14,7 @@ use crate::interface::{self, Support};
 
 use super::c_string;
 use super::log;
+use super::system;
 
 const ENTRYPOINT: &str = "spa_handle_factory_enum";
 type EntryPointFn = unsafe extern "C" fn(*const *mut CHandleFactory, *mut u32) -> c_int;
@@ -184,6 +185,7 @@ impl Handle for CHandleImpl {
 
         match type_ {
             interface::LOG => return Some(Box::new(log::new_impl(iface))),
+            interface::SYSTEM => return Some(Box::new(system::new_impl(iface))),
             _ => return None,
         }
     }

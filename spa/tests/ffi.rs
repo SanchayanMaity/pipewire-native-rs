@@ -5,7 +5,7 @@
 use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
-use pipewire_native_spa::interface::plugin::{Handle, HandleFactory};
+use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
 
 #[test]
@@ -52,4 +52,26 @@ fn test_load_support() {
         format_args!("log test: {}", "some format"),
     );
 
+    support.set_log(log);
+
+    let system_factory = plugin
+        .find_factory(interface::plugin::SYSTEM_FACTORY)
+        .expect("Should find system factory");
+
+    let interfaces = system_factory.enum_interface_info();
+    assert_eq!(interfaces.len(), 1);
+
+    let system_handle = system_factory
+        .init(None, &support)
+        .expect("System factory loading should succeed");
+
+    let system_iface = system_handle
+        .get_interface(interface::SYSTEM)
+        .expect("System factory should produce an interface");
+
+    let system = (system_iface as Box<dyn std::any::Any>)
+        .downcast::<SystemImpl>()
+        .expect("System interface should be a SystemImpl");
+
+    support.set_system(system);
 }
