@@ -5,7 +5,6 @@
 use std::{
     any::Any,
     ffi::{c_char, c_int, c_void, CStr, CString},
-    pin::Pin,
 };
 
 use crate::interface::ffi::CInterface;
