@@ -8,6 +8,7 @@ pipewire-native-macros = { path = "../macros" }
 bitflags = "2.8.0"
 libc = "0.2.172"
 libloading = "0.8.6"
+num = "0.4.3"
 
 [dev-dependencies]
 # For tests
