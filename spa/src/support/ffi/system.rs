@@ -3,14 +3,17 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
-    ffi::{c_int, c_ulong, c_void},
+    ffi::{c_int, c_ulong, c_void, CString},
     os::fd::RawFd,
 };
 
 use crate::interface::{
+    self,
     ffi::CInterface,
     system::{result_or_error, PollEvent, PollEvents, SystemImpl},
 };
+
+use super::c_string;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -20,13 +23,14 @@ struct CSystemMethods {
     /* read/write/ioctl */
     read: extern "C" fn(object: *mut c_void, fd: c_int, buf: *mut c_void, count: usize) -> isize,
     write: extern "C" fn(object: *mut c_void, fd: c_int, buf: *const c_void, count: usize) -> isize,
-    ioctl: extern "C" fn(object: *mut c_void, fd: c_int, request: c_ulong, ...) -> c_int,
+    ioctl: unsafe extern "C" fn(object: *mut c_void, fd: c_int, request: c_ulong, ...) -> c_int,
     close: extern "C" fn(object: *mut c_void, fd: c_int) -> c_int,
 
     /* clock */
     clock_gettime:
-        extern "C" fn(object: *mut c_void, clockid: c_int, value: libc::timespec) -> c_int,
-    clock_getres: extern "C" fn(object: *mut c_void, clockid: c_int, res: libc::timespec) -> c_int,
+        extern "C" fn(object: *mut c_void, clockid: c_int, value: *mut libc::timespec) -> c_int,
+    clock_getres:
+        extern "C" fn(object: *mut c_void, clockid: c_int, res: *mut libc::timespec) -> c_int,
 
     /* poll */
     pollfd_create: extern "C" fn(object: *mut c_void, pfd: c_int) -> c_int,
@@ -89,6 +93,7 @@ pub fn new_impl(interface: *mut CInterface) -> SystemImpl {
 
         read: CSystemImpl::read,
         write: CSystemImpl::write,
+        /* NOTE: we can't handle varargs, so we just directly call ioctl() */
         ioctl: libc::ioctl,
         close: CSystemImpl::close,
 
@@ -176,7 +181,7 @@ impl CSystemImpl {
             result_or_error(((*funcs).clock_gettime)(
                 system.iface.cb.data,
                 clockid,
-                *value,
+                value,
             ))
         }
     }
@@ -190,7 +195,7 @@ impl CSystemImpl {
             let system = Self::from_system(this);
             let funcs = system.iface.cb.funcs as *const CSystemMethods;
 
-            result_or_error(((*funcs).clock_getres)(system.iface.cb.data, clockid, *res))
+            result_or_error(((*funcs).clock_getres)(system.iface.cb.data, clockid, res))
         }
     }
 
@@ -436,6 +441,283 @@ impl CSystemImpl {
             ));
         } else {
             Ok(signal)
+        }
+    }
+}
+
+pub fn make_native(system: &SystemImpl) -> *mut CInterface {
+    let c_system: *mut CSystem =
+        unsafe { libc::calloc(1, std::mem::size_of::<CSystem>() as libc::size_t) as *mut CSystem };
+    let c_system = unsafe { &mut *c_system };
+
+    c_system.iface.version = 0;
+    c_system.iface.type_ = c_string(interface::LOG).into_raw();
+    c_system.iface.cb.funcs = &SYSTEM_METHODS as *const CSystemMethods as *mut c_void;
+    c_system.iface.cb.data = system as *const SystemImpl as *mut c_void;
+
+    c_system as *mut CSystem as *mut CInterface
+}
+
+pub fn free_native(c_system: *mut CInterface) {
+    unsafe {
+        let _ = CString::from_raw((*c_system).type_ as *mut i8);
+        libc::free(c_system as *mut c_void);
+    }
+}
+
+static SYSTEM_METHODS: CSystemMethods = CSystemMethods {
+    version: 0,
+
+    read: SystemImplIface::read,
+    write: SystemImplIface::write,
+    /* NOTE: we can't handle varargs, so we just directly call ioctl() */
+    ioctl: impl_ioctl,
+    close: SystemImplIface::close,
+
+    clock_gettime: SystemImplIface::clock_gettime,
+    clock_getres: SystemImplIface::clock_getres,
+
+    pollfd_create: SystemImplIface::pollfd_create,
+    pollfd_add: SystemImplIface::pollfd_add,
+    pollfd_mod: SystemImplIface::pollfd_mod,
+    pollfd_del: SystemImplIface::pollfd_del,
+    pollfd_wait: SystemImplIface::pollfd_wait,
+
+    timerfd_create: SystemImplIface::timerfd_create,
+    timerfd_settime: SystemImplIface::timerfd_settime,
+    timerfd_gettime: SystemImplIface::timerfd_gettime,
+    timerfd_read: SystemImplIface::timerfd_read,
+
+    eventfd_create: SystemImplIface::eventfd_create,
+    eventfd_read: SystemImplIface::eventfd_read,
+    eventfd_write: SystemImplIface::eventfd_write,
+
+    signalfd_create: SystemImplIface::signalfd_create,
+    signalfd_read: SystemImplIface::signalfd_read,
+};
+
+struct SystemImplIface {}
+
+extern "C" {
+    fn impl_ioctl(object: *mut c_void, fd: c_int, request: c_ulong, ...) -> c_int;
+}
+
+impl SystemImplIface {
+    fn c_to_system_impl(object: *mut c_void) -> &'static SystemImpl {
+        unsafe { &*(object as *mut SystemImpl) }
+    }
+
+    extern "C" fn read(object: *mut c_void, fd: c_int, buf: *mut c_void, count: usize) -> isize {
+        let system = Self::c_to_system_impl(object);
+        let buf = unsafe { std::slice::from_raw_parts_mut(buf as *mut u8, count) };
+
+        let res = system.read(fd, buf);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn write(object: *mut c_void, fd: c_int, buf: *const c_void, count: usize) -> isize {
+        let system = Self::c_to_system_impl(object);
+        let buf = unsafe { std::slice::from_raw_parts(buf as *const u8, count) };
+
+        let res = system.write(fd, buf);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn close(object: *mut c_void, fd: c_int) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.close(fd);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn clock_gettime(
+        object: *mut c_void,
+        clockid: c_int,
+        value: *mut libc::timespec,
+    ) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = unsafe { system.clock_gettime(clockid, value.as_mut().unwrap()) };
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn clock_getres(
+        object: *mut c_void,
+        clockid: c_int,
+        res: *mut libc::timespec,
+    ) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = unsafe { system.clock_getres(clockid, res.as_mut().unwrap()) };
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn pollfd_create(object: *mut c_void, flags: c_int) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.pollfd_create(flags);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn pollfd_add(
+        object: *mut c_void,
+        pfd: c_int,
+        fd: c_int,
+        events: PollEvents,
+        data: *mut c_void,
+    ) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.pollfd_add(pfd, fd, events, data as u64);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn pollfd_mod(
+        object: *mut c_void,
+        pfd: c_int,
+        fd: c_int,
+        events: PollEvents,
+        data: *mut c_void,
+    ) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.pollfd_mod(pfd, fd, events, data as u64);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn pollfd_del(object: *mut c_void, pfd: c_int, fd: c_int) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.pollfd_del(pfd, fd);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn pollfd_wait(
+        object: *mut c_void,
+        pfd: c_int,
+        ev: *mut PollEvent,
+        n_ev: c_int,
+        timeout: c_int,
+    ) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.pollfd_wait(
+            pfd,
+            unsafe { std::slice::from_raw_parts_mut(ev, n_ev as usize) },
+            timeout,
+        );
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn timerfd_create(object: *mut c_void, clockid: c_int, flags: c_int) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.timerfd_create(clockid, flags);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn timerfd_settime(
+        object: *mut c_void,
+        fd: c_int,
+        flags: c_int,
+        new_value: *const libc::itimerspec,
+        old_value: *mut libc::itimerspec,
+    ) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.timerfd_settime(fd, flags, unsafe { &*new_value }, unsafe {
+            &mut *old_value
+        });
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn timerfd_gettime(
+        object: *mut c_void,
+        fd: c_int,
+        curr_value: *mut libc::itimerspec,
+    ) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.timerfd_gettime(fd, unsafe { &mut *curr_value });
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn timerfd_read(object: *mut c_void, fd: c_int, expirations: *mut u64) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.timerfd_read(fd);
+
+        match res {
+            Ok(exp) => {
+                unsafe { *expirations = exp };
+                0
+            }
+            Err(_) => -1,
+        }
+    }
+
+    extern "C" fn eventfd_create(object: *mut c_void, flags: c_int) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.eventfd_create(flags);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn eventfd_read(object: *mut c_void, fd: c_int, count: *mut u64) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.eventfd_read(fd);
+
+        match res {
+            Ok(count_val) => {
+                unsafe { *count = count_val };
+                0
+            }
+            Err(_) => -1,
+        }
+    }
+
+    extern "C" fn eventfd_write(object: *mut c_void, fd: c_int, count: u64) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.eventfd_write(fd, count);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn signalfd_create(object: *mut c_void, signal: c_int, flags: c_int) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.signalfd_create(signal as u32, flags);
+
+        res.unwrap_or(-1)
+    }
+
+    extern "C" fn signalfd_read(object: *mut c_void, fd: c_int, signal: *mut c_int) -> i32 {
+        let system = Self::c_to_system_impl(object);
+
+        let res = system.signalfd_read(fd);
+
+        match res {
+            Ok(sig) => {
+                unsafe { *signal = sig as c_int };
+                0
+            }
+            Err(_) => -1,
         }
     }
 }

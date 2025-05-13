@@ -74,10 +74,10 @@ impl Support {
 
     pub fn set_system(&mut self, system: Box<SystemImpl>) {
         self.system = Some(Pin::new(system));
-        //self.add_or_update(
-        //    SYSTEM,
-        //    support::ffi::system::make_native(self.system.as_ref().unwrap()),
-        //);
+        self.add_or_update(
+            SYSTEM,
+            support::ffi::system::make_native(self.system.as_ref().unwrap()),
+        );
     }
 }
 
@@ -87,6 +87,7 @@ impl Drop for Support {
             let type_ = unsafe { CString::from_raw(s.type_) };
             match type_.to_str().unwrap() {
                 LOG => support::ffi::log::free_native(s.data as *mut CInterface),
+                SYSTEM => support::ffi::system::free_native(s.data as *mut CInterface),
                 _ => unreachable!(),
             }
         }
