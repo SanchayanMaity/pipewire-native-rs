@@ -10,7 +10,7 @@ use std::pin::Pin;
 
 use crate::interface;
 use crate::interface::plugin::{Handle, HandleFactory};
-use crate::interface::r#loop::LoopImpl;
+use crate::interface::r#loop::{LoopImpl, SourceFn};
 use crate::interface::system::SystemImpl;
 use crate::interface::{
     r#loop::{self, InvokeFn, Source},
@@ -20,7 +20,7 @@ use crate::interface::{
 pub struct Loop {
     system: Box<SystemImpl>,
     pollfd: RawFd,
-    sources: HashMap<RawFd, Pin<Box<Source>>>,
+    sources: HashMap<RawFd, (Pin<Box<Source>>, Pin<Box<SourceFn>>)>,
 }
 
 impl Loop {
@@ -53,7 +53,8 @@ impl Loop {
 impl Loop {
     fn add_source(
         this: &mut LoopImpl,
-        mut source: Pin<Box<r#loop::Source>>,
+        source: &r#loop::Source,
+        func: Box<SourceFn>,
     ) -> std::io::Result<i32> {
         // Shenanigans until downcast_mut_unchecked() is stable
         let inner = unsafe { Pin::into_inner_unchecked(this.inner.as_mut()) };
@@ -62,28 +63,33 @@ impl Loop {
         let fd = source.fd;
         let events =
             PollEvents::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
-        let data = &*source as *const Source as u64;
+        let mut source_ = Box::pin(source.clone());
+        let data = Pin::into_inner(source_.as_mut()) as *mut Source as u64;
 
-        source.rmask = 0;
-        self_.sources.insert(source.fd, source);
+        source_.rmask = 0;
+        self_
+            .sources
+            .insert(source.fd, (source_, Box::into_pin(func)));
 
         self_.system.pollfd_add(self_.pollfd, fd, events, data)
     }
 
-    fn update_source(
-        this: &mut LoopImpl,
-        source: Pin<Box<r#loop::Source>>,
-    ) -> std::io::Result<i32> {
+    fn update_source(this: &mut LoopImpl, source: &r#loop::Source) -> std::io::Result<i32> {
         // Shenanigans until downcast_mut_unchecked() is stable
         let inner = unsafe { Pin::into_inner_unchecked(this.inner.as_mut()) };
         let self_ = unsafe { &mut *(inner as *mut dyn Any as *mut Loop) };
 
         let fd = source.fd;
+        let entry = self_
+            .sources
+            .get_mut(&fd)
+            .ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?;
         let events =
             PollEvents::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
-        let data = &*source as *const Source as u64;
+        let data = Pin::into_inner(entry.0.as_mut()) as *mut Source as u64;
 
-        self_.sources.entry(source.fd).or_insert(source);
+        // Update the mask, as requested
+        entry.0.mask = source.mask;
 
         self_.system.pollfd_mod(self_.pollfd, fd, events, data)
     }
@@ -98,7 +104,13 @@ impl Loop {
         Ok(0)
     }
 
-    fn invoke(this: &mut LoopImpl, func: Pin<Box<InvokeFn>>, block: bool) -> std::io::Result<i32> {
+    fn invoke(
+        this: &mut LoopImpl,
+        seq: u32,
+        data: &[u8],
+        block: bool,
+        func: Box<InvokeFn>,
+    ) -> std::io::Result<i32> {
         Err(Error::from(ErrorKind::NotFound))
     }
 }

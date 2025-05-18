@@ -5,6 +5,7 @@
 use std::ffi::CString;
 
 pub mod log;
+pub mod r#loop;
 pub mod plugin;
 pub mod system;
 

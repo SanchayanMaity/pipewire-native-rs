@@ -79,6 +79,14 @@ impl Support {
             support::ffi::system::make_native(self.system.as_ref().unwrap()),
         );
     }
+
+    pub fn set_loop(&mut self, loop_: Box<LoopImpl>) {
+        self.loop_ = Some(Pin::new(loop_));
+        self.add_or_update(
+            LOOP,
+            support::ffi::r#loop::make_native(self.loop_.as_ref().unwrap()),
+        );
+    }
 }
 
 impl Drop for Support {
@@ -88,6 +96,7 @@ impl Drop for Support {
             match type_.to_str().unwrap() {
                 LOG => support::ffi::log::free_native(s.data as *mut CInterface),
                 SYSTEM => support::ffi::system::free_native(s.data as *mut CInterface),
+                LOOP => support::ffi::r#loop::free_native(s.data as *mut CInterface),
                 _ => unreachable!(),
             }
         }

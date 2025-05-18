@@ -6,31 +6,37 @@ use std::{any::Any, os::fd::RawFd, pin::Pin};
 
 use super::plugin::Interface;
 
-pub type SourceFn = dyn FnMut(&LoopImpl, &Source);
-
+#[derive(Copy, Clone, Debug)]
 pub struct Source {
-    pub func: Pin<Box<SourceFn>>,
     pub fd: RawFd,
     pub mask: u32,
     pub rmask: u32,
 }
 
-pub type InvokeFn = dyn FnMut(LoopImpl, bool, u32) -> i32;
+pub type SourceFn = dyn FnMut(&Source) + 'static;
+pub type InvokeFn = dyn FnMut(bool, u32, &[u8]) -> i32 + 'static;
 
 pub struct LoopImpl {
     pub inner: Pin<Box<dyn Any>>,
 
-    pub add_source: fn(&mut LoopImpl, source: Pin<Box<Source>>) -> std::io::Result<i32>,
-    pub update_source: fn(&mut LoopImpl, source: Pin<Box<Source>>) -> std::io::Result<i32>,
+    pub add_source: fn(&mut LoopImpl, source: &Source, func: Box<SourceFn>) -> std::io::Result<i32>,
+    pub update_source: fn(&mut LoopImpl, source: &Source) -> std::io::Result<i32>,
     pub remove_source: fn(&mut LoopImpl, fd: RawFd) -> std::io::Result<i32>,
-    pub invoke: fn(&mut LoopImpl, func: Pin<Box<InvokeFn>>, block: bool) -> std::io::Result<i32>,
+    pub invoke: fn(
+        this: &mut LoopImpl,
+        seq: u32,
+        data: &[u8],
+        block: bool,
+        func: Box<InvokeFn>,
+    ) -> std::io::Result<i32>,
 }
 
 impl LoopImpl {
-    pub fn add_source(&mut self, source: Pin<Box<Source>>) -> std::io::Result<i32> {
-        (self.add_source)(self, source)
+    pub fn add_source(&mut self, source: &Source, func: Box<SourceFn>) -> std::io::Result<i32> {
+        (self.add_source)(self, source, func)
     }
-    pub fn update_source(&mut self, source: Pin<Box<Source>>) -> std::io::Result<i32> {
+
+    pub fn update_source(&mut self, source: &Source) -> std::io::Result<i32> {
         (self.update_source)(self, source)
     }
 
@@ -38,8 +44,14 @@ impl LoopImpl {
         (self.remove_source)(self, fd)
     }
 
-    pub fn invoke(&mut self, func: Pin<Box<InvokeFn>>, block: bool) -> std::io::Result<i32> {
-        (self.invoke)(self, func, block)
+    pub fn invoke(
+        &mut self,
+        seq: u32,
+        data: &[u8],
+        block: bool,
+        func: Box<InvokeFn>,
+    ) -> std::io::Result<i32> {
+        (self.invoke)(self, seq, data, block, func)
     }
 }
 
