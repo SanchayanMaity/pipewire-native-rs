@@ -12,6 +12,12 @@ pub struct Properties {
     dict: HashMap<String, String>,
 }
 
+impl Default for Properties {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Properties {
     pub fn new() -> Self {
         Self {
@@ -64,19 +70,19 @@ impl Properties {
     }
 
     pub fn get_u32(&self, key: &str) -> Option<u32> {
-        self.get(key).and_then(|v| u32::from_str_radix(v, 10).ok())
+        self.get(key).and_then(|v| v.parse::<u32>().ok())
     }
 
     pub fn get_i32(&self, key: &str) -> Option<i32> {
-        self.get(key).and_then(|v| i32::from_str_radix(v, 10).ok())
+        self.get(key).and_then(|v| v.parse::<i32>().ok())
     }
 
     pub fn get_u64(&self, key: &str) -> Option<u64> {
-        self.get(key).and_then(|v| u64::from_str_radix(v, 10).ok())
+        self.get(key).and_then(|v| v.parse::<u64>().ok())
     }
 
     pub fn get_i64(&self, key: &str) -> Option<i64> {
-        self.get(key).and_then(|v| i64::from_str_radix(v, 10).ok())
+        self.get(key).and_then(|v| v.parse::<i64>().ok())
     }
 
     pub fn get_bool(&self, key: &str) -> Option<bool> {
