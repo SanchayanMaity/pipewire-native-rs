@@ -23,7 +23,11 @@ pub fn init() {
         let mut log_info = Properties::new();
         log_info.set(
             spa::interface::log::LEVEL,
-            utils::read_env_string("PIPEWIRE_LOG_COLOR", "true"),
+            if support.no_color {
+                "false".to_string()
+            } else {
+                utils::read_env_string("PIPEWIRE_LOG_COLOR", "true")
+            },
         );
         log_info.set(
             spa::interface::log::TIMESTAMP,

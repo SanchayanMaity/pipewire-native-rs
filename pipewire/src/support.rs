@@ -13,9 +13,10 @@ use crate::properties::Properties;
 use crate::utils;
 
 pub struct Support {
-    do_dlclose: bool,
-    no_color: bool,
-    no_config: bool,
+    // TODO: Implement when we have unload_spa_handle()
+    _do_dlclose: bool,
+    pub no_color: bool,
+    pub _no_config: bool,
 
     plugin_dirs: Vec<String>,
     support_lib: String,
@@ -44,8 +45,8 @@ impl Support {
         let support_lib = std::env::var("SPA_SUPPORT_LIB").unwrap_or(SUPPORTLIB.to_string());
 
         Support {
-            do_dlclose,
-            no_config,
+            _do_dlclose: do_dlclose,
+            _no_config: no_config,
             no_color,
             plugin_dirs: plugin_dir,
             support_lib,
