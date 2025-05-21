@@ -5,7 +5,7 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 
 use pipewire_native_spa as spa;
 
@@ -31,10 +31,8 @@ struct Inner {
 
 const SUPPORTLIB: &str = "support/libspa-support";
 
-static SUPPORT: OnceLock<Support> = OnceLock::new();
-
-pub fn get() -> &'static Support {
-    SUPPORT.get_or_init(|| {
+impl Support {
+    pub fn new() -> Support {
         let do_dlclose = utils::read_env_bool("PIPEWIRE_DLCLOSE", false);
         let no_color = utils::read_env_bool("NO_COLOR", false);
         let no_config = utils::read_env_bool("PIPEWIRE_NO_CONFIG", false);
@@ -57,10 +55,8 @@ pub fn get() -> &'static Support {
                 support: spa::interface::Support::new(),
             }),
         }
-    })
-}
+    }
 
-impl Support {
     pub fn load_spa_handle(
         &self,
         lib: Option<&str>,
