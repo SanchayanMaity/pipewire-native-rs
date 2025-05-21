@@ -77,47 +77,45 @@ impl Support {
 
     pub fn set_log(&mut self, log: Box<LogImpl>) {
         self.log = Some(Pin::new(log));
-        self.add_or_update(
-            LOG,
-            support::ffi::log::make_native(self.log.as_ref().unwrap()),
-        );
+        self.add_or_update(LOG, unsafe {
+            support::ffi::log::make_native(self.log.as_ref().unwrap())
+        });
     }
 
     pub fn set_system(&mut self, system: Box<SystemImpl>) {
         self.system = Some(Pin::new(system));
-        self.add_or_update(
-            SYSTEM,
-            support::ffi::system::make_native(self.system.as_ref().unwrap()),
-        );
+        self.add_or_update(SYSTEM, unsafe {
+            support::ffi::system::make_native(self.system.as_ref().unwrap())
+        });
     }
 
     pub fn set_loop(&mut self, loop_: Box<LoopImpl>) {
         self.loop_ = Some(Pin::new(loop_));
-        self.add_or_update(
-            LOOP,
-            support::ffi::r#loop::make_native(self.loop_.as_ref().unwrap()),
-        );
+        self.add_or_update(LOOP, unsafe {
+            support::ffi::r#loop::make_native(self.loop_.as_ref().unwrap())
+        });
     }
 
     pub fn set_cpu(&mut self, cpu: Box<CpuImpl>) {
         self.cpu = Some(Pin::new(cpu));
-        self.add_or_update(
-            CPU,
-            support::ffi::cpu::make_native(self.cpu.as_ref().unwrap()),
-        );
+        self.add_or_update(CPU, unsafe {
+            support::ffi::cpu::make_native(self.cpu.as_ref().unwrap())
+        });
     }
 }
 
 impl Drop for Support {
     fn drop(&mut self) {
         for s in self.all.iter_mut() {
-            let type_ = unsafe { CString::from_raw(s.type_) };
-            match type_.to_str().unwrap() {
-                CPU => support::ffi::cpu::free_native(s.data as *mut CInterface),
-                LOG => support::ffi::log::free_native(s.data as *mut CInterface),
-                SYSTEM => support::ffi::system::free_native(s.data as *mut CInterface),
-                LOOP => support::ffi::r#loop::free_native(s.data as *mut CInterface),
-                _ => unreachable!(),
+            unsafe {
+                let type_ = CString::from_raw(s.type_);
+                match type_.to_str().unwrap() {
+                    CPU => support::ffi::cpu::free_native(s.data as *mut CInterface),
+                    LOOP => support::ffi::r#loop::free_native(s.data as *mut CInterface),
+                    LOG => support::ffi::log::free_native(s.data as *mut CInterface),
+                    SYSTEM => support::ffi::system::free_native(s.data as *mut CInterface),
+                    _ => unreachable!(),
+                }
             }
         }
     }

@@ -187,7 +187,7 @@ static CPU_METHODS: CCpuMethods = CCpuMethods {
     zero_denormals: CpuImplIface::zero_denormals,
 };
 
-pub fn make_native(cpu: &CpuImpl) -> *mut CInterface {
+pub unsafe fn make_native(cpu: &CpuImpl) -> *mut CInterface {
     let c_cpu: *mut CCpu =
         unsafe { libc::calloc(1, std::mem::size_of::<CCpu>() as libc::size_t) as *mut CCpu };
     let c_cpu = unsafe { &mut *c_cpu };
@@ -200,7 +200,7 @@ pub fn make_native(cpu: &CpuImpl) -> *mut CInterface {
     c_cpu as *mut CCpu as *mut CInterface
 }
 
-pub fn free_native(c_cpu: *mut CInterface) {
+pub unsafe fn free_native(c_cpu: *mut CInterface) {
     unsafe {
         let _ = CString::from_raw((*c_cpu).type_ as *mut i8);
         libc::free(c_cpu as *mut c_void);

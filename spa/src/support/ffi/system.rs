@@ -445,7 +445,7 @@ impl CSystemImpl {
     }
 }
 
-pub fn make_native(system: &SystemImpl) -> *mut CInterface {
+pub unsafe fn make_native(system: &SystemImpl) -> *mut CInterface {
     let c_system: *mut CSystem =
         unsafe { libc::calloc(1, std::mem::size_of::<CSystem>() as libc::size_t) as *mut CSystem };
     let c_system = unsafe { &mut *c_system };
@@ -458,7 +458,7 @@ pub fn make_native(system: &SystemImpl) -> *mut CInterface {
     c_system as *mut CSystem as *mut CInterface
 }
 
-pub fn free_native(c_system: *mut CInterface) {
+pub unsafe fn free_native(c_system: *mut CInterface) {
     unsafe {
         let _ = CString::from_raw((*c_system).type_ as *mut i8);
         libc::free(c_system as *mut c_void);
