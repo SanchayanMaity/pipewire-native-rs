@@ -2,14 +2,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use std::any::Any;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 use pipewire_native_spa as spa;
-use pipewire_native_spa::dict::Dict;
-use pipewire_native_spa::interface::plugin::{self, Handle};
-use pipewire_native_spa::support::ffi;
 
 use crate::properties;
 
@@ -25,8 +23,8 @@ pub struct Support {
 }
 
 struct Inner {
-    plugins: HashMap<String, ffi::plugin::Plugin>,
-    factories: HashMap<String, Box<dyn plugin::HandleFactory>>,
+    plugins: HashMap<String, spa::support::ffi::plugin::Plugin>,
+    factories: HashMap<String, Box<dyn spa::interface::plugin::HandleFactory>>,
     support: spa::interface::Support,
 }
 
@@ -73,8 +71,8 @@ impl Support {
         &self,
         lib: Option<&str>,
         factory_name: &str,
-        info: Option<Dict>,
-    ) -> std::io::Result<Box<dyn Handle>> {
+        info: Option<spa::dict::Dict>,
+    ) -> std::io::Result<Box<dyn spa::interface::plugin::Handle>> {
         let mut inner = self.inner.lock().unwrap();
         let lib = lib.unwrap_or(&self.support_lib);
 
@@ -92,7 +90,7 @@ impl Support {
                     plugin = Some(p);
                     break;
                 }
-                None => match ffi::plugin::load(&path) {
+                None => match spa::support::ffi::plugin::load(&path) {
                     Ok(p) => {
                         inner.plugins.insert(lib_name.to_string(), p);
                         plugin = inner.plugins.get(&lib_name);
@@ -135,6 +133,65 @@ impl Support {
         })?;
 
         Ok(handle)
+    }
+
+    pub fn load_interface(
+        &self,
+        factory_name: &str,
+        iface_type: &str,
+        info: Option<spa::dict::Dict>,
+    ) -> std::io::Result<()> {
+        let factory = self.load_spa_handle(None, factory_name, info)?;
+
+        let iface = factory.get_interface(iface_type).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Interface not found: {}", iface_type),
+            )
+        })?;
+
+        match iface_type {
+            spa::interface::CPU => {
+                let cpu = (iface as Box<dyn Any>)
+                    .downcast::<spa::interface::cpu::CpuImpl>()
+                    .map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
+                    })?;
+                self.inner.lock().unwrap().support.set_cpu(cpu);
+            }
+            spa::interface::LOG => {
+                let log = (iface as Box<dyn Any>)
+                    .downcast::<spa::interface::log::LogImpl>()
+                    .map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
+                    })?;
+                self.inner.lock().unwrap().support.set_log(log);
+            }
+            spa::interface::LOOP => {
+                let loop_impl = (iface as Box<dyn Any>)
+                    .downcast::<spa::interface::r#loop::LoopImpl>()
+                    .map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
+                    })?;
+                self.inner.lock().unwrap().support.set_loop(loop_impl);
+            }
+            spa::interface::SYSTEM => {
+                let system = (iface as Box<dyn Any>)
+                    .downcast::<spa::interface::system::SystemImpl>()
+                    .map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
+                    })?;
+                self.inner.lock().unwrap().support.set_system(system);
+            }
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("Unsupported interface type: {}", iface_type),
+                ));
+            }
+        }
+
+        Ok(())
     }
 }
 
