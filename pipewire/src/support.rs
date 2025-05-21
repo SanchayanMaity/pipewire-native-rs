@@ -36,7 +36,7 @@ fn read_env_bool(var: &str) -> bool {
         .unwrap_or(false)
 }
 
-const SUPPORTLIB: &str = "support/libspa-support.so";
+const SUPPORTLIB: &str = "support/libspa-support";
 
 static SUPPORT: OnceLock<Support> = OnceLock::new();
 
@@ -83,7 +83,7 @@ impl Support {
 
         for dir in self.plugin_dirs.iter() {
             let mut path = PathBuf::from(dir);
-            path.push(lib);
+            path.push(format! {"{}.so", lib});
 
             lib_name = path.to_string_lossy().to_string();
 
