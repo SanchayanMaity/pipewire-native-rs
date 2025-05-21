@@ -56,7 +56,7 @@ fn test_load_support() {
         format_args!("log test: {}", "some format"),
     );
 
-    support.set_log(log);
+    support.add_interface(interface::LOG, log);
 
     let system_factory = plugin
         .find_factory(interface::plugin::SYSTEM_FACTORY)
@@ -77,7 +77,7 @@ fn test_load_support() {
         .downcast::<SystemImpl>()
         .expect("System interface should be a SystemImpl");
 
-    support.set_system(system);
+    support.add_interface(interface::SYSTEM, system);
 
     let cpu_factory = plugin
         .find_factory(interface::plugin::CPU_FACTORY)
@@ -98,5 +98,5 @@ fn test_load_support() {
         .downcast::<CpuImpl>()
         .expect("CPU interface should be a CpuImpl");
 
-    support.set_cpu(cpu);
+    support.add_interface(interface::CPU, cpu);
 }

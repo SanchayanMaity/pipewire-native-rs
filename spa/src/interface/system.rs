@@ -234,7 +234,15 @@ impl SystemImpl {
     }
 }
 
-impl Interface for SystemImpl {}
+impl Interface for SystemImpl {
+    unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
+        crate::support::ffi::system::make_native(self)
+    }
+
+    unsafe fn free_native(system: *mut super::ffi::CInterface) {
+        crate::support::ffi::system::free_native(system)
+    }
+}
 
 unsafe impl Send for SystemImpl {}
 unsafe impl Sync for SystemImpl {}

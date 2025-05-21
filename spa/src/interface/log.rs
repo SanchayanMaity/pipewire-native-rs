@@ -82,4 +82,12 @@ impl LogImpl {
     }
 }
 
-impl Interface for LogImpl {}
+impl Interface for LogImpl {
+    unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
+        crate::support::ffi::log::make_native(self)
+    }
+
+    unsafe fn free_native(log: *mut super::ffi::CInterface) {
+        crate::support::ffi::log::free_native(log)
+    }
+}

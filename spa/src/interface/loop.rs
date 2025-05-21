@@ -55,4 +55,12 @@ impl LoopImpl {
     }
 }
 
-impl Interface for LoopImpl {}
+impl Interface for LoopImpl {
+    unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
+        crate::support::ffi::r#loop::make_native(self)
+    }
+
+    unsafe fn free_native(loop_: *mut super::ffi::CInterface) {
+        crate::support::ffi::r#loop::free_native(loop_)
+    }
+}

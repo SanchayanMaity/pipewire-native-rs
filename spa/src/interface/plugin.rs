@@ -6,11 +6,18 @@ use std::any::Any;
 
 use crate::dict::Dict;
 
+use super::ffi::CInterface;
+
 pub const LOG_FACTORY: &str = "support.log";
 pub const SYSTEM_FACTORY: &str = "support.system";
 pub const CPU_FACTORY: &str = "support.cpu";
 
-pub trait Interface: Any {}
+pub trait Interface: Any {
+    unsafe fn make_native(&self) -> *mut CInterface;
+    unsafe fn free_native(cpu: *mut CInterface)
+    where
+        Self: Sized;
+}
 
 pub struct InterfaceInfo {
     pub type_: String,

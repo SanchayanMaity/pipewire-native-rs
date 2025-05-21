@@ -114,8 +114,8 @@ impl HandleFactory for CHandleFactoryImpl {
             let size = (self.factory.as_ref().unwrap().get_size)(self.factory, info_ptr);
             let handle = libc::malloc(size) as *mut CHandle;
             let (support, n_support) = {
-                let all = support.all();
-                (all.as_ptr(), all.len())
+                let c_support = support.c_support();
+                (c_support.as_ptr(), c_support.len())
             };
             let ret = (self.factory.as_ref().unwrap().init)(
                 self.factory,

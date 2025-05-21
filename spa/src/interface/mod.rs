@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use std::{
+    collections::HashMap,
     ffi::{c_void, CStr, CString},
     pin::Pin,
 };
@@ -29,24 +30,18 @@ pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
 pub const CPU: &str = "Spa:Pointer:Interface:Cpu";
 
 pub struct Support {
-    cpu: Option<Pin<Box<CpuImpl>>>,
-    log: Option<Pin<Box<LogImpl>>>,
-    system: Option<Pin<Box<SystemImpl>>>,
-    loop_: Option<Pin<Box<LoopImpl>>>,
+    supports: HashMap<&'static str, Pin<Box<dyn plugin::Interface>>>,
     /* We keep a C-compatible array that won't get moved around, so we can reliably pass it on to
      * plugins */
-    all: Vec<CSupport>,
+    c_supports: Vec<CSupport>,
 }
 
 impl Default for Support {
     fn default() -> Self {
         Support {
-            cpu: None,
-            log: None,
-            system: None,
-            loop_: None,
+            supports: HashMap::new(),
             /* Reserve enough space so the array is always valid */
-            all: Vec::with_capacity(16),
+            c_supports: Vec::with_capacity(16),
         }
     }
 }
@@ -56,12 +51,12 @@ impl Support {
         Support::default()
     }
 
-    pub fn all(&self) -> &Vec<CSupport> {
-        &self.all
+    pub fn c_support(&self) -> &Vec<CSupport> {
+        &self.c_supports
     }
 
-    fn add_or_update(&mut self, name: &str, data: *mut CInterface) {
-        for s in self.all.iter_mut() {
+    fn add_or_update_c(&mut self, name: &str, data: *mut CInterface) {
+        for s in self.c_supports.iter_mut() {
             let type_ = unsafe { CStr::from_ptr(s.type_).to_str() };
             if type_ == Ok(name) {
                 s.data = data as *mut c_void;
@@ -69,51 +64,33 @@ impl Support {
             }
         }
 
-        self.all.push(CSupport {
+        self.c_supports.push(CSupport {
             type_: support::ffi::c_string(name).into_raw(),
             data: data as *mut c_void,
         });
     }
 
-    pub fn set_log(&mut self, log: Box<LogImpl>) {
-        self.log = Some(Pin::new(log));
-        self.add_or_update(LOG, unsafe {
-            support::ffi::log::make_native(self.log.as_ref().unwrap())
-        });
-    }
+    pub fn add_interface(&mut self, name: &'static str, iface: Box<dyn plugin::Interface>) {
+        let pin = Box::into_pin(iface);
+        let data = unsafe { pin.make_native() };
 
-    pub fn set_system(&mut self, system: Box<SystemImpl>) {
-        self.system = Some(Pin::new(system));
-        self.add_or_update(SYSTEM, unsafe {
-            support::ffi::system::make_native(self.system.as_ref().unwrap())
-        });
-    }
-
-    pub fn set_loop(&mut self, loop_: Box<LoopImpl>) {
-        self.loop_ = Some(Pin::new(loop_));
-        self.add_or_update(LOOP, unsafe {
-            support::ffi::r#loop::make_native(self.loop_.as_ref().unwrap())
-        });
-    }
-
-    pub fn set_cpu(&mut self, cpu: Box<CpuImpl>) {
-        self.cpu = Some(Pin::new(cpu));
-        self.add_or_update(CPU, unsafe {
-            support::ffi::cpu::make_native(self.cpu.as_ref().unwrap())
-        });
+        self.supports.insert(name, pin);
+        self.add_or_update_c(name, data);
     }
 }
 
 impl Drop for Support {
     fn drop(&mut self) {
-        for s in self.all.iter_mut() {
+        for s in self.c_supports.iter_mut() {
             unsafe {
                 let type_ = CString::from_raw(s.type_);
                 match type_.to_str().unwrap() {
-                    CPU => support::ffi::cpu::free_native(s.data as *mut CInterface),
-                    LOOP => support::ffi::r#loop::free_native(s.data as *mut CInterface),
-                    LOG => support::ffi::log::free_native(s.data as *mut CInterface),
-                    SYSTEM => support::ffi::system::free_native(s.data as *mut CInterface),
+                    CPU => <CpuImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
+                    LOOP => <LoopImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
+                    LOG => <LogImpl as plugin::Interface>::free_native(s.data as *mut CInterface),
+                    SYSTEM => {
+                        <SystemImpl as plugin::Interface>::free_native(s.data as *mut CInterface)
+                    }
                     _ => unreachable!(),
                 }
             }

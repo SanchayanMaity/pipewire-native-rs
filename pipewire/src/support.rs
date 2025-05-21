@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::any::Any;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -131,7 +130,7 @@ impl Support {
     pub fn load_interface(
         &self,
         factory_name: &str,
-        iface_type: &str,
+        iface_type: &'static str,
         info: Option<&Properties>,
     ) -> std::io::Result<()> {
         let factory = self.load_spa_handle(None, factory_name, info)?;
@@ -143,46 +142,11 @@ impl Support {
             )
         })?;
 
-        match iface_type {
-            spa::interface::CPU => {
-                let cpu = (iface as Box<dyn Any>)
-                    .downcast::<spa::interface::cpu::CpuImpl>()
-                    .map_err(|_| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
-                    })?;
-                self.inner.lock().unwrap().support.set_cpu(cpu);
-            }
-            spa::interface::LOG => {
-                let log = (iface as Box<dyn Any>)
-                    .downcast::<spa::interface::log::LogImpl>()
-                    .map_err(|_| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
-                    })?;
-                self.inner.lock().unwrap().support.set_log(log);
-            }
-            spa::interface::LOOP => {
-                let loop_impl = (iface as Box<dyn Any>)
-                    .downcast::<spa::interface::r#loop::LoopImpl>()
-                    .map_err(|_| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
-                    })?;
-                self.inner.lock().unwrap().support.set_loop(loop_impl);
-            }
-            spa::interface::SYSTEM => {
-                let system = (iface as Box<dyn Any>)
-                    .downcast::<spa::interface::system::SystemImpl>()
-                    .map_err(|_| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid type")
-                    })?;
-                self.inner.lock().unwrap().support.set_system(system);
-            }
-            _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("Unsupported interface type: {}", iface_type),
-                ));
-            }
-        }
+        self.inner
+            .lock()
+            .unwrap()
+            .support
+            .add_interface(iface_type, iface);
 
         Ok(())
     }

@@ -192,7 +192,15 @@ impl CpuImpl {
     }
 }
 
-impl Interface for CpuImpl {}
+impl Interface for CpuImpl {
+    unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
+        crate::support::ffi::cpu::make_native(self)
+    }
+
+    unsafe fn free_native(cpu: *mut super::ffi::CInterface) {
+        crate::support::ffi::cpu::free_native(cpu)
+    }
+}
 
 unsafe impl Send for CpuImpl {}
 unsafe impl Sync for CpuImpl {}
