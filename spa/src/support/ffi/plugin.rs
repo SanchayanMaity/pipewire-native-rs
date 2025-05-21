@@ -200,7 +200,7 @@ impl Handle for CHandleImpl {
     }
 }
 
-pub fn load(path: PathBuf) -> Result<Plugin, String> {
+pub fn load(path: &PathBuf) -> Result<Plugin, String> {
     unsafe {
         let library = Library::open(Some(path), RTLD_NOW).map_err(|e| format!("{}", e))?;
         let entrypoint: Symbol<EntryPointFn> = library

@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 
+use pipewire_native_spa::atob;
 use pipewire_native_spa::dict::Dict;
 use tinyjson::{JsonParseError, JsonValue};
 
@@ -16,6 +17,10 @@ impl Default for Properties {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub fn parse_bool(value: &String) -> bool {
+    atob(value)
 }
 
 impl Properties {

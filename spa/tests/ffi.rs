@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use std::path::PathBuf;
+
 use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::cpu::CpuImpl;
@@ -16,7 +18,8 @@ fn test_load_support() {
     let plugin_path = std::env::var("SPA_TEST_PLUGIN_PATH")
         .unwrap_or("/usr/lib64/spa-0.2/support/libspa-support.so".to_string());
 
-    let plugin = ffi::plugin::load(plugin_path.into()).expect("Plugin loading should not fail");
+    let plugin =
+        ffi::plugin::load(&PathBuf::from(plugin_path)).expect("Plugin loading should not fail");
 
     let log_factory = plugin
         .find_factory(interface::plugin::LOG_FACTORY)
