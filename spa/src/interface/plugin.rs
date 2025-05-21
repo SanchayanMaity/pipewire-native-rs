@@ -30,11 +30,6 @@ pub trait HandleFactory {
     fn info(&self) -> Option<&Dict>;
 
     /* Methods */
-    /* The 'static trait bound allows the borrow-checker to not assume that the output type holds a
-     * reference to `support` which is a bit of a lie, but we're expressing an implied contract
-     * that support will be a global, and that the associated support handles that are being
-     * referenced inside the `Support` structure will be dropped at the same time as the structure
-     * by the loading entity. */
     fn init(
         &self,
         info: Option<Dict>,
