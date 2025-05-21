@@ -41,12 +41,8 @@ impl HandleFactory for Plugin {
         None
     }
 
-    fn init(
-        &self,
-        _: Option<Dict>,
-        _: &interface::Support,
-    ) -> std::io::Result<impl Handle + 'static> {
-        Ok(PluginHandle {})
+    fn init(&self, _: Option<Dict>, _: &interface::Support) -> std::io::Result<Box<dyn Handle>> {
+        Ok(Box::new(PluginHandle {}))
     }
 
     fn enum_interface_info(&self) -> Vec<InterfaceInfo> {

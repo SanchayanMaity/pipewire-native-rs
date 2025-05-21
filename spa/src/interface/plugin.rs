@@ -32,7 +32,7 @@ pub trait HandleFactory {
         &self,
         info: Option<Dict>,
         support: &super::Support,
-    ) -> std::io::Result<impl Handle + 'static>;
+    ) -> std::io::Result<Box<dyn Handle>>;
     fn enum_interface_info(&self) -> Vec<InterfaceInfo>;
 }
 
