@@ -8,6 +8,13 @@ use pipewire_native_macros::EnumU32;
 
 use super::plugin::Interface;
 
+pub const LEVEL: &str = "log.level";
+pub const COLORS: &str = "log.colors";
+pub const FILE: &str = "log.file";
+pub const TIMESTAMP: &str = "log.timestamp";
+pub const LINE: &str = "log.line";
+pub const PATTERNS: &str = "log.patterns";
+
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, EnumU32)]
 pub enum LogLevel {

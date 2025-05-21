@@ -2,10 +2,15 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
 
-use super::plugin::Interface;
 use bitflags::bitflags;
-use pipewire_native_macros::EnumU32;
 use std::{any::Any, pin::Pin};
+
+use pipewire_native_macros::EnumU32;
+
+use super::plugin::Interface;
+
+pub const FORCE: &str = "cpu.force";
+pub const VM: &str = "cpu.vm";
 
 bitflags! {
     #[repr(C)]

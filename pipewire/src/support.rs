@@ -9,7 +9,8 @@ use std::sync::{Mutex, OnceLock};
 
 use pipewire_native_spa as spa;
 
-use crate::properties;
+use crate::properties::Properties;
+use crate::utils;
 
 pub struct Support {
     do_dlclose: bool,
@@ -28,24 +29,17 @@ struct Inner {
     support: spa::interface::Support,
 }
 
-fn read_env_bool(var: &str) -> bool {
-    std::env::var(var)
-        .map(|v| properties::parse_bool(&v))
-        .unwrap_or(false)
-}
-
 const SUPPORTLIB: &str = "support/libspa-support";
 
 static SUPPORT: OnceLock<Support> = OnceLock::new();
 
 pub fn get() -> &'static Support {
     SUPPORT.get_or_init(|| {
-        let do_dlclose = read_env_bool("PIPEWIRE_DLCLOSE");
-        let no_color = read_env_bool("NO_COLOR");
-        let no_config = read_env_bool("PIPEWIRE_NO_CONFIG");
+        let do_dlclose = utils::read_env_bool("PIPEWIRE_DLCLOSE", false);
+        let no_color = utils::read_env_bool("NO_COLOR", false);
+        let no_config = utils::read_env_bool("PIPEWIRE_NO_CONFIG", false);
         /* FIXME: unhardcode */
-        let plugin_dir = std::env::var("SPA_PLUGIN_DIR")
-            .unwrap_or("/usr/lib64/spa-0.2".to_string())
+        let plugin_dir = utils::read_env_string("SPA_PLUGIN_DIR", "/usr/lib64/spa-0.2")
             .split(':')
             .map(|s| s.to_string())
             .collect();
@@ -71,7 +65,7 @@ impl Support {
         &self,
         lib: Option<&str>,
         factory_name: &str,
-        info: Option<spa::dict::Dict>,
+        info: Option<&Properties>,
     ) -> std::io::Result<Box<dyn spa::interface::plugin::Handle>> {
         let mut inner = self.inner.lock().unwrap();
         let lib = lib.unwrap_or(&self.support_lib);
@@ -128,9 +122,11 @@ impl Support {
             },
         };
 
-        let handle = factory.init(info, &inner.support).map_err(|_| {
-            std::io::Error::other(format!("Failed to initialize factory: {}", factory_name))
-        })?;
+        let handle = factory
+            .init(info.map(|p| p.dict()), &inner.support)
+            .map_err(|_| {
+                std::io::Error::other(format!("Failed to initialize factory: {}", factory_name))
+            })?;
 
         Ok(handle)
     }
@@ -139,7 +135,7 @@ impl Support {
         &self,
         factory_name: &str,
         iface_type: &str,
-        info: Option<spa::dict::Dict>,
+        info: Option<&Properties>,
     ) -> std::io::Result<()> {
         let factory = self.load_spa_handle(None, factory_name, info)?;
 
