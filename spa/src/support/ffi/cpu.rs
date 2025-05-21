@@ -8,6 +8,15 @@ use crate::interface;
 use crate::interface::cpu::{CpuFlags, CpuImpl, CpuVm};
 use crate::interface::ffi::CInterface;
 
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+use crate::interface::cpu::ArmCpuFlags;
+#[cfg(any(target_arch = "powerpc64", target_arch = "powerpc"))]
+use crate::interface::cpu::PpcCpuFlags;
+#[cfg(target_arch = "riscv64")]
+use crate::interface::cpu::RiscvCpuFlags;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::interface::cpu::X86CpuFlags;
+
 use super::c_string;
 
 #[repr(C)]
@@ -55,12 +64,23 @@ impl CCpuImpl {
         }
     }
 
+    fn arch_cpu_flags(flags: u32) -> CpuFlags {
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        return CpuFlags::X86(X86CpuFlags::from_bits(flags).expect("Expected valid CPU flags"));
+        #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+        return CpuFlags::Arm(ArmCpuFlags::from_bits(flags).expect("Expected valid CPU flags"));
+        #[cfg(any(target_arch = "powerpc64", target_arch = "powerpc"))]
+        return CpuFlags::Ppc(PpcCpuFlags::from_bits(flags).expect("Expected valid CPU flags"));
+        #[cfg(target_arch = "riscv64")]
+        return CpuFlags::Riscv(RiscvCpuFlags::from_bits(flags).expect("Expected valid CPU flags"));
+    }
+
     fn get_flags(this: &CpuImpl) -> CpuFlags {
         unsafe {
             let cpu = Self::from_cpu(this);
             let funcs = cpu.iface.cb.funcs as *const CCpuMethods;
 
-            CpuFlags::try_from(((*funcs).get_flags)(cpu.iface.cb.data)).unwrap()
+            Self::arch_cpu_flags(((*funcs).get_flags)(cpu.iface.cb.data))
         }
     }
 
@@ -69,7 +89,7 @@ impl CCpuImpl {
             let cpu = Self::from_cpu(this);
             let funcs = cpu.iface.cb.funcs as *const CCpuMethods;
 
-            ((*funcs).force_flags)(cpu.iface.cb.data, flags as u32)
+            ((*funcs).force_flags)(cpu.iface.cb.data, u32::from(flags))
         }
     }
 
@@ -121,7 +141,7 @@ impl CpuImplIface {
     extern "C" fn get_flags(object: *mut c_void) -> c_uint {
         let cpu_impl = Self::c_to_cpu_impl(object);
 
-        cpu_impl.get_flags() as u32
+        u32::from(cpu_impl.get_flags())
     }
 
     extern "C" fn force_flags(object: *mut c_void, flags: c_uint) -> c_int {

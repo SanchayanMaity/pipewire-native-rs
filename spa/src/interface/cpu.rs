@@ -39,7 +39,7 @@ bitflags! {
 bitflags! {
     #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumU32)]
-    pub struct PPCCpuFlags: u32 {
+    pub struct PpcCpuFlags: u32 {
         const ALTIVEC = (1<<0);	/* standard */
         const VSX     = (1<<1);	/* ISA 2.06 */
         const POWER8  = (1<<2);	/* ISA 2.07 */
@@ -50,7 +50,7 @@ bitflags! {
 bitflags! {
     #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumU32)]
-    pub struct ARMCpuFlags : u32 {
+    pub struct ArmCpuFlags : u32 {
         const ARMV5TE = (1 << 0);
         const ARMV6   = (1 << 1);
         const ARMV6T2 = (1 << 2);
@@ -65,22 +65,44 @@ bitflags! {
 bitflags! {
     #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumU32)]
-    pub struct RISCVCpuFlags : u32 {
+    pub struct RiscvCpuFlags : u32 {
         const RISCV_V = (1 << 0);
         const _       = !0;       /* The source may set any bits */
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumU32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CpuFlags {
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    X86CpuFlags,
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
-    ARMCpuFlags,
-    #[cfg(any(target_arch = "powerpc64", target_arch = "powerpc"))]
-    PPCCpuFlags,
-    #[cfg(target_arch = "riscv64")]
-    RISCVCpuFlags,
+    X86(X86CpuFlags),
+    Arm(ArmCpuFlags),
+    Ppc(PpcCpuFlags),
+    Riscv(RiscvCpuFlags),
+}
+
+impl TryFrom<u32> for CpuFlags {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        return Ok(CpuFlags::X86(X86CpuFlags::from_bits(value).ok_or(())?));
+        #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+        return Ok(CpuFlags::Arm(ArmCpuFlags::from_bits(value).ok_or(())?));
+        #[cfg(any(target_arch = "powerpc64", target_arch = "powerpc"))]
+        return Ok(CpuFlags::Ppc(PpcCpuFlags::from_bits(value).ok_or(())?));
+        #[cfg(target_arch = "riscv64")]
+        return Ok(CpuFlags::Riscv(RiscvCpuFlags::from_bits(value).ok_or(())?));
+    }
+}
+
+impl From<CpuFlags> for u32 {
+    fn from(value: CpuFlags) -> Self {
+        match value {
+            CpuFlags::X86(flags) => flags.bits(),
+            CpuFlags::Arm(flags) => flags.bits(),
+            CpuFlags::Ppc(flags) => flags.bits(),
+            CpuFlags::Riscv(flags) => flags.bits(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumU32)]
