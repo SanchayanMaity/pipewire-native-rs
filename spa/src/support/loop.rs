@@ -9,7 +9,7 @@ use std::os::fd::RawFd;
 use std::pin::Pin;
 
 use crate::interface;
-use crate::interface::plugin::{Handle, HandleFactory};
+use crate::interface::plugin::HandleFactory;
 use crate::interface::r#loop::{LoopImpl, SourceFn};
 use crate::interface::system::SystemImpl;
 use crate::interface::{
