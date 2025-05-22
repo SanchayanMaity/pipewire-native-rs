@@ -123,10 +123,10 @@ impl CLogImpl {
         func: &CStr,
         args: std::fmt::Arguments,
     ) {
-        let log_line = match args.as_str() {
-            Some(s) => s,
-            _ => return,
-        };
+        let log_line = args
+            .as_str()
+            .map(c_string)
+            .unwrap_or(CString::new(args.to_string()).unwrap());
 
         unsafe {
             let log = this
@@ -137,13 +137,14 @@ impl CLogImpl {
                 .as_ref()
                 .unwrap();
             let funcs = log.iface.cb.funcs as *const CLogMethods;
+
             ((*funcs).log)(
                 log.iface.cb.data,
                 level,
                 file.as_ptr(),
                 line,
                 func.as_ptr(),
-                c_string(log_line).as_ptr(),
+                log_line.as_ptr(),
             )
         };
     }
