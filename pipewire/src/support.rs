@@ -15,7 +15,7 @@ pub struct Support {
     // TODO: Implement when we have unload_spa_handle()
     _do_dlclose: bool,
     pub no_color: bool,
-    pub _no_config: bool,
+    pub no_config: bool,
 
     plugin_dirs: Vec<String>,
     support_lib: String,
@@ -45,7 +45,7 @@ impl Support {
 
         Support {
             _do_dlclose: do_dlclose,
-            _no_config: no_config,
+            no_config,
             no_color,
             plugin_dirs: plugin_dir,
             support_lib,

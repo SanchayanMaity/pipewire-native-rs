@@ -9,7 +9,11 @@ use pipewire_native_spa as spa;
 use properties::Properties;
 use support::Support;
 
+pub mod conf;
+pub mod context;
+pub mod keys;
 pub mod properties;
+
 mod support;
 mod utils;
 
