@@ -85,8 +85,8 @@ extern "C" fn rust_logt(
 ) {
     let log_impl = unsafe { &mut *(impl_ as *mut LogImpl) };
     let level = LogLevel::try_from(level as u32).unwrap();
-    let file = unsafe { CStr::from_ptr(file).to_str().unwrap() };
-    let func = unsafe { CStr::from_ptr(func).to_str().unwrap() };
+    let file = unsafe { CStr::from_ptr(file) };
+    let func = unsafe { CStr::from_ptr(func) };
     let log = unsafe { CStr::from_ptr(log).to_str().unwrap() };
 
     if topic.is_null() {
@@ -95,7 +95,7 @@ extern "C" fn rust_logt(
         let topic = unsafe {
             let c_topic = &*topic;
             LogTopic {
-                topic: CStr::from_ptr(c_topic.topic).to_str().unwrap().to_string(),
+                topic: CStr::from_ptr(c_topic.topic),
                 level: LogLevel::try_from(c_topic.level as u32).unwrap(),
                 has_custom_level: c_topic.has_custom_level,
             }
@@ -118,9 +118,9 @@ impl CLogImpl {
     fn log(
         this: &LogImpl,
         level: crate::interface::log::LogLevel,
-        file: &str,
+        file: &CStr,
         line: i32,
-        func: &str,
+        func: &CStr,
         args: std::fmt::Arguments,
     ) {
         let log_line = match args.as_str() {
@@ -140,9 +140,9 @@ impl CLogImpl {
             ((*funcs).log)(
                 log.iface.cb.data,
                 level,
-                c_string(file).as_ptr(),
+                file.as_ptr(),
                 line,
-                c_string(func).as_ptr(),
+                func.as_ptr(),
                 c_string(log_line).as_ptr(),
             )
         };
@@ -152,15 +152,14 @@ impl CLogImpl {
         this: &LogImpl,
         level: LogLevel,
         topic: &crate::interface::log::LogTopic,
-        file: &str,
+        file: &CStr,
         line: i32,
-        func: &str,
+        func: &CStr,
         args: std::fmt::Arguments,
     ) {
-        let topic_name = c_string(topic.topic.as_str());
         let ctopic = CLogTopic {
             version: 0,
-            topic: topic_name.as_ptr(),
+            topic: topic.topic.as_ptr(),
             level,
             has_custom_level: topic.has_custom_level,
         };
@@ -183,9 +182,9 @@ impl CLogImpl {
                 log.iface.cb.data,
                 level,
                 &ctopic,
-                c_string(file).as_ptr(),
+                file.as_ptr(),
                 line,
-                c_string(func).as_ptr(),
+                func.as_ptr(),
                 log_line.as_ptr(),
             )
         };

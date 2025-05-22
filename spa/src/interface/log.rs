@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{any::Any, pin::Pin};
+use std::{any::Any, ffi::CStr, pin::Pin};
 
 use pipewire_native_macros::EnumU32;
 
@@ -28,7 +28,9 @@ pub enum LogLevel {
 
 #[derive(Debug)]
 pub struct LogTopic {
-    pub topic: String,
+    /* We use a CStr to make translation to C more efficient. We don't need this to be owned, as we
+     * expect to allocate it from global strings */
+    pub topic: &'static CStr,
     pub level: LogLevel,
     pub has_custom_level: bool,
 }
@@ -41,18 +43,18 @@ pub struct LogImpl {
     pub log: fn(
         this: &LogImpl,
         level: LogLevel,
-        file: &str,
+        file: &CStr,
         line: i32,
-        func: &str,
+        func: &CStr,
         args: std::fmt::Arguments,
     ),
     pub logt: fn(
         this: &LogImpl,
         level: LogLevel,
         topic: &LogTopic,
-        file: &str,
+        file: &CStr,
         line: i32,
-        func: &str,
+        func: &CStr,
         args: std::fmt::Arguments,
     ),
 }
@@ -61,9 +63,9 @@ impl LogImpl {
     pub fn log(
         &self,
         level: LogLevel,
-        file: &str,
+        file: &CStr,
         line: i32,
-        func: &str,
+        func: &CStr,
         args: std::fmt::Arguments,
     ) {
         (self.log)(self, level, file, line, func, args)
@@ -73,9 +75,9 @@ impl LogImpl {
         &self,
         level: LogLevel,
         topic: &LogTopic,
-        file: &str,
+        file: &CStr,
         line: i32,
-        func: &str,
+        func: &CStr,
         args: std::fmt::Arguments,
     ) {
         (self.logt)(self, level, topic, file, line, func, args)
