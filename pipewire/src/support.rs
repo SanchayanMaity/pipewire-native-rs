@@ -4,6 +4,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::pin::Pin;
+use std::rc::Rc;
 use std::sync::Mutex;
 
 use pipewire_native_spa as spa;
@@ -11,7 +13,7 @@ use pipewire_native_spa as spa;
 use crate::properties::Properties;
 use crate::utils;
 
-pub struct Support {
+pub(crate) struct Support {
     // TODO: Implement when we have unload_spa_handle()
     _do_dlclose: bool,
     pub no_color: bool,
@@ -21,6 +23,7 @@ pub struct Support {
     support_lib: String,
 
     inner: Mutex<Inner>,
+    log: Option<Rc<Pin<Box<spa::interface::log::LogImpl>>>>,
 }
 
 struct Inner {
@@ -54,11 +57,26 @@ impl Support {
                 factories: HashMap::new(),
                 support: spa::interface::Support::new(),
             }),
+            log: None,
         }
     }
 
+    pub(super) fn init_log(&mut self) {
+        let inner = self.inner.lock().unwrap();
+
+        self.log = inner
+            .support
+            .get_interface::<spa::interface::log::LogImpl>(spa::interface::LOG);
+    }
+
+    pub fn log(&self) -> &Rc<Pin<Box<spa::interface::log::LogImpl>>> {
+        self.log
+            .as_ref()
+            .expect("Log interface should be initialized")
+    }
+
     pub fn load_spa_handle(
-        &self,
+        &mut self,
         lib: Option<&str>,
         factory_name: &str,
         info: Option<&Properties>,
@@ -128,7 +146,7 @@ impl Support {
     }
 
     pub fn load_interface(
-        &self,
+        &mut self,
         factory_name: &str,
         iface_type: &'static str,
         info: Option<&Properties>,

@@ -4,7 +4,9 @@
 
 use std::{ffi::CStr, sync::LazyLock};
 
-use crate::{conf, keys, properties::Properties};
+use crate::{conf, debug, default_topic, keys, log, properties::Properties};
+
+default_topic!(log::topic::CONTEXT);
 
 pub struct Context {
     properties: Properties,
@@ -26,6 +28,8 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 impl Context {
     pub fn new(properties: Properties) -> std::io::Result<Self> {
         let mut this = Context { properties };
+
+        debug!("Creating context");
 
         this.set_default_properties();
         this.load_conf()?;

@@ -6,6 +6,7 @@ use std::{
     collections::HashMap,
     ffi::{c_void, CStr, CString},
     pin::Pin,
+    rc::Rc,
 };
 
 use cpu::CpuImpl;
@@ -30,7 +31,7 @@ pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
 pub const CPU: &str = "Spa:Pointer:Interface:Cpu";
 
 pub struct Support {
-    supports: HashMap<&'static str, Pin<Box<dyn plugin::Interface>>>,
+    supports: HashMap<&'static str, Rc<Pin<Box<dyn plugin::Interface>>>>,
     /* We keep a C-compatible array that won't get moved around, so we can reliably pass it on to
      * plugins */
     c_supports: Vec<CSupport>,
@@ -74,8 +75,14 @@ impl Support {
         let pin = Box::into_pin(iface);
         let data = unsafe { pin.make_native() };
 
-        self.supports.insert(name, pin);
+        self.supports.insert(name, Rc::new(pin));
         self.add_or_update_c(name, data);
+    }
+
+    pub fn get_interface<T: plugin::Interface>(&self, name: &str) -> Option<Rc<Pin<Box<T>>>> {
+        let iface = self.supports.get(name).cloned();
+
+        iface.and_then(|iface| Rc::downcast::<Pin<Box<T>>>(iface).ok())
     }
 }
 

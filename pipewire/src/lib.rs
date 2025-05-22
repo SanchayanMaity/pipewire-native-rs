@@ -12,16 +12,17 @@ use support::Support;
 pub mod conf;
 pub mod context;
 pub mod keys;
+pub mod log;
 pub mod properties;
 
 mod support;
 mod utils;
 
-static GLOBAL_SUPPORT: OnceLock<Support> = OnceLock::new();
+pub(crate) static GLOBAL_SUPPORT: OnceLock<Support> = OnceLock::new();
 
 pub fn init() {
     GLOBAL_SUPPORT.get_or_init(|| {
-        let support = Support::new();
+        let mut support = Support::new();
 
         // First, initialise logging
         let mut log_info = Properties::new();
@@ -74,6 +75,8 @@ pub fn init() {
                 Some(&cpu_info),
             )
             .expect("failed to load CPU interface");
+
+        support.init_log();
 
         // TODO: Load i18n interface
         support
