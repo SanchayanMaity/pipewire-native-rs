@@ -13,7 +13,16 @@ pub const SYSTEM_FACTORY: &str = "support.system";
 pub const CPU_FACTORY: &str = "support.cpu";
 
 pub trait Interface {
+    /// Return a C-compatible spa_interface pointer
+    ///
+    /// # Safety
+    /// The caller must manually free the returned pointer using `free_native()`.
     unsafe fn make_native(&self) -> *mut CInterface;
+
+    /// Return a C-compatible spa_interface pointer
+    ///
+    /// # Safety
+    /// The pointer must have been allocated using `make_native()`.
     unsafe fn free_native(cpu: *mut CInterface)
     where
         Self: Sized;
@@ -33,6 +42,8 @@ impl std::fmt::Debug for dyn Interface {
             .finish()
     }
 }
+
+type RefcountedPinBox<T> = Rc<Pin<Box<T>>>;
 
 impl dyn Interface {
     pub fn is<T>(&self) -> bool
@@ -54,8 +65,8 @@ impl dyn Interface {
     }
 
     pub fn downcast_rc_pin_box<T>(
-        self: Rc<Pin<Box<Self>>>,
-    ) -> Result<Rc<Pin<Box<T>>>, Rc<Pin<Box<Self>>>>
+        self: RefcountedPinBox<Self>,
+    ) -> Result<RefcountedPinBox<T>, RefcountedPinBox<Self>>
     where
         T: 'static,
     {

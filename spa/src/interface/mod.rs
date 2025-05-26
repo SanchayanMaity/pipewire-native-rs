@@ -79,9 +79,9 @@ impl Support {
         self.add_or_update_c(name, data);
     }
 
-    pub fn get_interface<T: plugin::Interface + Sized>(&self, name: &str) -> Option<Rc<Pin<Box<T>>>>
+    pub fn get_interface<T>(&self, name: &str) -> Option<Rc<Pin<Box<T>>>>
     where
-        T: 'static,
+        T: plugin::Interface + 'static,
     {
         let iface = self.supports.get(name).cloned();
 

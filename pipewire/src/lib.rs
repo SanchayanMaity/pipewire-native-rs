@@ -53,7 +53,10 @@ pub fn init() {
         // provides a default
         log_info.set(
             spa::interface::log::LEVEL,
-            format!("{}", levels.iter().find(|v| v.0 == "").unwrap().1 as u32),
+            format!(
+                "{}",
+                levels.iter().find(|v| v.0.is_empty()).unwrap().1 as u32
+            ),
         );
 
         // TODO: Check for/load the systemd logger if PIPEWIRE_SYSTEMD is set

@@ -22,6 +22,7 @@ pub struct LoopImpl {
     pub add_source: fn(&mut LoopImpl, source: &Source, func: Box<SourceFn>) -> std::io::Result<i32>,
     pub update_source: fn(&mut LoopImpl, source: &Source) -> std::io::Result<i32>,
     pub remove_source: fn(&mut LoopImpl, fd: RawFd) -> std::io::Result<i32>,
+    #[allow(clippy::type_complexity)]
     pub invoke: fn(
         this: &mut LoopImpl,
         seq: u32,

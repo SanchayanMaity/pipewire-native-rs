@@ -104,11 +104,11 @@ extern "C" fn rust_logt(
     }
 }
 
-pub unsafe fn make_native(log: &LogImpl) -> *mut CInterface {
+pub(crate) unsafe fn make_native(log: &LogImpl) -> *mut CInterface {
     unsafe { c_log_from_impl(log as *const dyn Any as *const c_void, log.level) as *mut CInterface }
 }
 
-pub unsafe fn free_native(c_log: *mut CInterface) {
+pub(crate) unsafe fn free_native(c_log: *mut CInterface) {
     unsafe {
         c_log_free(c_log as *mut CLog);
     }

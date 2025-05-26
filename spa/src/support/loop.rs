@@ -20,11 +20,12 @@ use crate::interface::{
 pub struct Loop {
     system: Box<SystemImpl>,
     pollfd: RawFd,
+    #[allow(clippy::type_complexity)]
     sources: HashMap<RawFd, (Pin<Box<Source>>, Pin<Box<SourceFn>>)>,
 }
 
 impl Loop {
-    pub fn new(support: &interface::Support) -> std::io::Result<LoopImpl> {
+    pub fn new_impl(support: &interface::Support) -> std::io::Result<LoopImpl> {
         let system_iface = super::plugin()
             .init(None, support)
             .unwrap()
@@ -103,11 +104,11 @@ impl Loop {
     }
 
     fn invoke(
-        this: &mut LoopImpl,
-        seq: u32,
-        data: &[u8],
-        block: bool,
-        func: Box<InvokeFn>,
+        _this: &mut LoopImpl,
+        _seq: u32,
+        _data: &[u8],
+        _block: bool,
+        _func: Box<InvokeFn>,
     ) -> std::io::Result<i32> {
         Err(Error::from(ErrorKind::NotFound))
     }

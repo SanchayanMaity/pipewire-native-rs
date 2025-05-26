@@ -28,7 +28,7 @@ pub(crate) mod topic {
     define_topic!(CONTEXT, "pw.context");
     define_topic!(SUPPORT, "pw.support");
 
-    pub fn init(levels: &Vec<(String, spa::interface::log::LogLevel)>) {
+    pub fn init(levels: &[(String, spa::interface::log::LogLevel)]) {
         for topic in [&CONF, &CONTEXT, &SUPPORT] {
             // TODO: implement glob matching
             let pattern = levels.iter().find(|v| v.0 == topic.1);
@@ -38,7 +38,7 @@ pub(crate) mod topic {
             };
 
             let _ = topic.0.set(spa::interface::log::LogTopic {
-                topic: &std::ffi::CStr::from_bytes_with_nul(topic.1.as_bytes()).unwrap(),
+                topic: std::ffi::CStr::from_bytes_with_nul(topic.1.as_bytes()).unwrap(),
                 level,
                 has_custom_level,
             });
@@ -58,13 +58,13 @@ macro_rules! default_topic {
 #[macro_export]
 macro_rules! log_topic {
     ($level:expr, $topic:expr, $($args:tt),+) => {
-        let log = crate::GLOBAL_SUPPORT.get().unwrap().log();
+        let log = $crate::GLOBAL_SUPPORT.get().unwrap().log();
         log.logt(
             $level,
             &$topic,
-            &crate::cstr!(file!()),
+            &$crate::cstr!(file!()),
             line!() as i32,
-            crate::cstr!("TODO"),
+            $crate::cstr!("TODO"),
             format_args!($($args),+),
         );
     };
@@ -73,42 +73,42 @@ macro_rules! log_topic {
 #[macro_export]
 macro_rules! log_default {
     ($level:expr, $($args:tt),+) => {
-        crate::log_topic!($level, DEFAULT_TOPIC, $($args),+);
+        $crate::log_topic!($level, DEFAULT_TOPIC, $($args),+);
     };
 }
 
 #[macro_export]
 macro_rules! error {
     ($($args:tt),+) => {
-        crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Error, $($args),+);
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Error, $($args),+);
     };
 }
 
 #[macro_export]
 macro_rules! warn {
     ($($args:tt),+) => {
-        crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Warn, $($args),+);
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Warn, $($args),+);
     };
 }
 
 #[macro_export]
 macro_rules! info {
     ($($args:tt),+) => {
-        crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Info, $($args),+);
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Info, $($args),+);
     };
 }
 
 #[macro_export]
 macro_rules! debug {
     ($($args:tt),+) => {
-        crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Debug, $($args),+);
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Debug, $($args),+);
     };
 }
 
 #[macro_export]
 macro_rules! trace {
     ($(args:tt),+) => {
-        crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Trace, $($args),+);
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Trace, $($args),+);
     };
 }
 

@@ -56,22 +56,22 @@ impl Context {
     }
 
     fn set_default_properties(&mut self) {
-        if None == self.properties.get(keys::APP_NAME) {
+        if self.properties.get(keys::APP_NAME).is_none() {
             self.properties.set(keys::APP_NAME, PROCESS_NAME.clone());
         };
-        if None == self.properties.get(keys::APP_PROCESS_BINARY) {
+        if self.properties.get(keys::APP_PROCESS_BINARY).is_none() {
             self.properties.set(keys::APP_NAME, PROCESS_NAME.clone());
         };
-        if None == self.properties.get(keys::APP_LANGUAGE) {
+        if self.properties.get(keys::APP_LANGUAGE).is_none() {
             if let Ok(lang) = std::env::var("LANG") {
                 self.properties.set(keys::APP_LANGUAGE, lang);
             }
         };
-        if None == self.properties.get(keys::APP_PROCESS_ID) {
+        if self.properties.get(keys::APP_PROCESS_ID).is_none() {
             self.properties
                 .set(keys::APP_PROCESS_ID, std::process::id().to_string());
         };
-        if None == self.properties.get(keys::APP_PROCESS_USER) {
+        if self.properties.get(keys::APP_PROCESS_USER).is_none() {
             if let Some(user) = unsafe {
                 libc::getpwuid(libc::getuid())
                     .as_ref()
@@ -80,7 +80,7 @@ impl Context {
                 self.properties.set(keys::APP_PROCESS_USER, user);
             }
         };
-        if None == self.properties.get(keys::APP_PROCESS_HOST) {
+        if self.properties.get(keys::APP_PROCESS_HOST).is_none() {
             let mut name: [u8; 256] = [0; 256];
             unsafe { libc::gethostname(name.as_mut_ptr() as *mut i8, name.len() as libc::size_t) };
             if let Ok(hostname) = CStr::from_bytes_until_nul(&name) {
@@ -90,13 +90,13 @@ impl Context {
                 );
             }
         };
-        if None == self.properties.get(keys::APP_PROCESS_SESSION_ID) {
+        if self.properties.get(keys::APP_PROCESS_SESSION_ID).is_none() {
             if let Ok(session_id) = std::env::var("XDG_SESSION_ID") {
                 self.properties
                     .set(keys::APP_PROCESS_SESSION_ID, session_id);
             }
         };
-        if None == self.properties.get(keys::WINDOW_X11_DISPLAY) {
+        if self.properties.get(keys::WINDOW_X11_DISPLAY).is_none() {
             if let Ok(display) = std::env::var("DISPLAY") {
                 self.properties.set(keys::WINDOW_X11_DISPLAY, display);
             }
