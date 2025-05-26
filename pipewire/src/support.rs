@@ -29,6 +29,7 @@ pub(crate) struct Support {
 struct Inner {
     plugins: HashMap<String, spa::support::ffi::plugin::Plugin>,
     factories: HashMap<String, Box<dyn spa::interface::plugin::HandleFactory>>,
+    handles: Vec<(String, Box<dyn spa::interface::plugin::Handle>)>,
     support: spa::interface::Support,
 }
 
@@ -55,6 +56,7 @@ impl Support {
             inner: Mutex::new(Inner {
                 plugins: HashMap::new(),
                 factories: HashMap::new(),
+                handles: Vec::new(),
                 support: spa::interface::Support::new(),
             }),
             log: None,
@@ -160,11 +162,10 @@ impl Support {
             )
         })?;
 
-        self.inner
-            .lock()
-            .unwrap()
-            .support
-            .add_interface(iface_type, iface);
+        let mut inner = self.inner.lock().unwrap();
+
+        inner.support.add_interface(iface_type, iface);
+        inner.handles.push((factory_name.to_string(), factory));
 
         Ok(())
     }
