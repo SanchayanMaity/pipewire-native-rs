@@ -14,7 +14,8 @@ macro_rules! cstr {
 #[macro_export]
 macro_rules! define_topic {
     ($name:ident, $topic:literal) => {
-        // We store the topic and name as a tuple of (name, topic)
+        // We store the topic and name as a tuple of (name, topic), with the name being
+        // null-terminated for easy usage while creating a spa_log_topic
         pub static $name: (
             &str,
             ::std::sync::OnceLock<::pipewire_native_spa::interface::log::LogTopic>,
@@ -32,9 +33,13 @@ pub(crate) mod topic {
     pub fn init(levels: &[(String, spa::interface::log::LogLevel)]) {
         for topic in [&CONF, &CONTEXT, &SUPPORT] {
             // TODO: implement glob matching
-            let pattern = levels.iter().find(|v| v.0 == topic.0);
+            let pattern = levels.iter().find(|v| {
+                let stripped = &topic.0[0..topic.0.len() - 1];
+                eprintln!("{} {}", stripped, v.0);
+                v.0 == stripped
+            });
             let (level, has_custom_level) = match pattern {
-                Some(&(ref pat, level)) if pat == topic.0 => (level, true),
+                Some(&(_, level)) => (level, true),
                 _ => (spa::interface::log::LogLevel::Warn, false),
             };
 
@@ -114,20 +119,21 @@ macro_rules! trace {
 }
 
 pub(super) fn parse_levels(levels: Option<&str>) -> Vec<(String, spa::interface::log::LogLevel)> {
+    let mut have_global = false;
     let mut result = Vec::new();
 
-    if levels.is_none() {
-        result.push(("".to_string(), spa::interface::log::LogLevel::Warn));
-        return result;
-    }
-
-    let levels = levels.unwrap().split(',').collect::<Vec<_>>();
+    let levels = levels
+        .map(|s| s.split(',').collect::<Vec<_>>())
+        .unwrap_or(vec![]);
 
     for pattern in levels {
         let parts = pattern.split(':').collect::<Vec<_>>();
 
         let (name, level_str) = match parts.len() {
-            1 => ("".to_string(), parts[0]),
+            1 => {
+                have_global = true;
+                ("".to_string(), parts[0])
+            }
             2 => (parts[0].to_string(), parts[1]),
             _ => {
                 continue;
@@ -141,6 +147,11 @@ pub(super) fn parse_levels(levels: Option<&str>) -> Vec<(String, spa::interface:
         } else {
             continue;
         }
+    }
+
+    if !have_global {
+        result.push(("".to_string(), spa::interface::log::LogLevel::Warn));
+        return result;
     }
 
     result

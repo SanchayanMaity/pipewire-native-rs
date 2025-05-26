@@ -16,7 +16,7 @@ pub const LINE: &str = "log.line";
 pub const PATTERNS: &str = "log.patterns";
 
 #[repr(u32)]
-#[derive(Copy, Clone, Debug, EnumU32)]
+#[derive(Copy, Clone, Debug, EnumU32, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LogLevel {
     None = 0,
     Error,

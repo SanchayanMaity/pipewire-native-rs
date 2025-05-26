@@ -123,6 +123,10 @@ impl CLogImpl {
         func: &CStr,
         args: std::fmt::Arguments,
     ) {
+        if level > this.level {
+            return;
+        }
+
         let log_line = args
             .as_str()
             .map(c_string)
@@ -158,6 +162,12 @@ impl CLogImpl {
         func: &CStr,
         args: std::fmt::Arguments,
     ) {
+        if topic.has_custom_level && level > topic.level {
+            return;
+        } else if !topic.has_custom_level && level > this.level {
+            return;
+        }
+
         let ctopic = CLogTopic {
             version: 0,
             topic: topic.topic.as_ptr(),
