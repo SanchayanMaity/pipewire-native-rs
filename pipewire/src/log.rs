@@ -35,7 +35,6 @@ pub(crate) mod topic {
             // TODO: implement glob matching
             let pattern = levels.iter().find(|v| {
                 let stripped = &topic.0[0..topic.0.len() - 1];
-                eprintln!("{} {}", stripped, v.0);
                 v.0 == stripped
             });
             let (level, has_custom_level) = match pattern {
@@ -124,7 +123,7 @@ pub(super) fn parse_levels(levels: Option<&str>) -> Vec<(String, spa::interface:
 
     let levels = levels
         .map(|s| s.split(',').collect::<Vec<_>>())
-        .unwrap_or(vec![]);
+        .unwrap_or_default();
 
     for pattern in levels {
         let parts = pattern.split(':').collect::<Vec<_>>();
