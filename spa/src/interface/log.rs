@@ -26,6 +26,21 @@ pub enum LogLevel {
     Trace,
 }
 
+impl TryFrom<&str> for LogLevel {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, ()> {
+        match value {
+            "E" | "1" => Ok(LogLevel::Error),
+            "W" | "2" => Ok(LogLevel::Warn),
+            "I" | "3" => Ok(LogLevel::Info),
+            "D" | "4" => Ok(LogLevel::Debug),
+            "T" | "5" => Ok(LogLevel::Trace),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct LogTopic {
     /* We use a CStr to make translation to C more efficient. We don't need this to be owned, as we
