@@ -62,7 +62,7 @@ macro_rules! default_topic {
 
 #[macro_export]
 macro_rules! log_topic {
-    ($level:expr, $topic:expr, $($args:tt),+) => {
+    ($level:expr, $topic:expr, $($args:tt)+) => {
         let log = $crate::GLOBAL_SUPPORT.get().unwrap().log();
         log.logt(
             $level,
@@ -70,50 +70,50 @@ macro_rules! log_topic {
             &$crate::cstr!(file!()),
             line!() as i32,
             $crate::cstr!("TODO"),
-            format_args!($($args),+),
+            format_args!($($args)+),
         );
     };
 }
 
 #[macro_export]
 macro_rules! log_default {
-    ($level:expr, $($args:tt),+) => {
-        $crate::log_topic!($level, DEFAULT_TOPIC, $($args),+);
+    ($level:expr, $($args:tt)+) => {
+        $crate::log_topic!($level, DEFAULT_TOPIC, $($args)+);
     };
 }
 
 #[macro_export]
 macro_rules! error {
-    ($($args:tt),+) => {
-        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Error, $($args),+);
+    ($($args:tt)+) => {
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Error, $($args)+);
     };
 }
 
 #[macro_export]
 macro_rules! warn {
-    ($($args:tt),+) => {
-        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Warn, $($args),+);
+    ($($args:tt)+) => {
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Warn, $($args)+);
     };
 }
 
 #[macro_export]
 macro_rules! info {
-    ($($args:tt),+) => {
-        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Info, $($args),+);
+    ($($args:tt)+) => {
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Info, $($args)+);
     };
 }
 
 #[macro_export]
 macro_rules! debug {
-    ($($args:tt),+) => {
-        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Debug, $($args),+);
+    ($($args:tt)+) => {
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Debug, $($args)+);
     };
 }
 
 #[macro_export]
 macro_rules! trace {
-    ($(args:tt),+) => {
-        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Trace, $($args),+);
+    ($($args:tt)+) => {
+        $crate::log_default!(::pipewire_native_spa::interface::log::LogLevel::Trace, $($args)+);
     };
 }
 
