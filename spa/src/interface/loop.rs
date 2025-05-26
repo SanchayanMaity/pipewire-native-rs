@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use crate::interface::ffi::{CControlHooks, CHook, CSource};
 use std::{any::Any, os::fd::RawFd, pin::Pin};
 
 use super::plugin::Interface;
@@ -63,5 +64,137 @@ impl Interface for LoopImpl {
 
     unsafe fn free_native(loop_: *mut super::ffi::CInterface) {
         crate::support::ffi::r#loop::free_native(loop_)
+    }
+}
+
+pub struct ControlMethodsImpl {
+    pub inner: Pin<Box<dyn Any>>,
+
+    pub get_fd: fn(&ControlMethodsImpl) -> u32,
+    pub add_hook: fn(&ControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
+    pub enter: fn(&ControlMethodsImpl),
+    pub leave: fn(&ControlMethodsImpl),
+    pub iterate: fn(&ControlMethodsImpl) -> i32,
+    pub check: fn(&ControlMethodsImpl) -> i32,
+}
+
+impl ControlMethodsImpl {
+    pub fn get_fd(&self) -> u32 {
+        (self.get_fd)(self)
+    }
+
+    pub fn add_hook(&self, hook: &CHook, hooks: &CControlHooks, data: u64) {
+        (self.add_hook)(self, hook, hooks, data)
+    }
+
+    pub fn enter(&self) {
+        (self.enter)(self)
+    }
+
+    pub fn leave(&self) {
+        (self.leave)(self)
+    }
+
+    pub fn iterate(&self) -> i32 {
+        (self.iterate)(self)
+    }
+
+    pub fn check(&self) -> i32 {
+        (self.check)(self)
+    }
+}
+
+impl Interface for ControlMethodsImpl {
+    unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
+        crate::support::ffi::r#loop::control_methods_make_native(self)
+    }
+
+    unsafe fn free_native(loop_: *mut super::ffi::CInterface) {
+        crate::support::ffi::r#loop::control_methods_free_native(loop_)
+    }
+}
+
+pub type SourceIoFn = dyn FnMut(RawFd, u32) + 'static;
+pub type SourceIdleFn = dyn FnMut() + 'static;
+pub type SourceEventFn = dyn FnMut(u64) + 'static;
+pub type SourceTimerFn = dyn FnMut(u64) + 'static;
+pub type SourceSignalFn = dyn FnMut(i32) + 'static;
+
+pub struct LoopUtilsImpl {
+    pub inner: Pin<Box<dyn Any>>,
+
+    pub add_io: fn(&LoopUtilsImpl, fd: RawFd, mask: u32, close: bool, func: Box<SourceIoFn>),
+    pub update_io: fn(&LoopUtilsImpl, source: &mut CSource, mask: u32),
+    pub add_idle: fn(&LoopUtilsImpl, enabled: bool, func: Box<SourceIdleFn>),
+    pub enable_idle: fn(&LoopUtilsImpl, source: &mut CSource, enabled: bool),
+    pub add_event: fn(&LoopUtilsImpl, func: Box<SourceEventFn>),
+    pub signal_event: fn(&LoopUtilsImpl, source: &mut CSource),
+    pub add_timer: fn(&LoopUtilsImpl, func: Box<SourceTimerFn>),
+    pub update_timer: fn(
+        &LoopUtilsImpl,
+        source: &mut CSource,
+        value: &libc::timespec,
+        interval: &libc::timespec,
+        absolute: bool,
+    ),
+    pub add_signal: fn(&LoopUtilsImpl, signal_number: i32, func: Box<SourceSignalFn>),
+    pub destroy_source: fn(&LoopUtilsImpl, source: &mut CSource),
+}
+
+impl LoopUtilsImpl {
+    pub fn add_io(&self, fd: RawFd, mask: u32, close: bool, func: Box<SourceIoFn>) {
+        (self.add_io)(self, fd, mask, close, func)
+    }
+
+    pub fn update_io(&self, source: &mut CSource, mask: u32) {
+        (self.update_io)(self, source, mask)
+    }
+
+    pub fn add_idle(&self, enabled: bool, func: Box<SourceIdleFn>) {
+        (self.add_idle)(self, enabled, func)
+    }
+
+    pub fn enable_idle(&self, source: &mut CSource, enabled: bool) {
+        (self.enable_idle)(self, source, enabled)
+    }
+
+    pub fn add_event(&self, func: Box<SourceEventFn>) {
+        (self.add_event)(self, func)
+    }
+
+    pub fn signal_event(&self, source: &mut CSource) {
+        (self.signal_event)(self, source)
+    }
+
+    pub fn add_timer(&self, func: Box<SourceTimerFn>) {
+        (self.add_timer)(self, func)
+    }
+
+    pub fn update_timer(
+        &self,
+        source: &mut CSource,
+        value: &libc::timespec,
+        interval: &libc::timespec,
+        absolute: bool,
+    ) {
+        (self.update_timer)(self, source, value, interval, absolute)
+    }
+
+    pub fn add_signal(&self, signal_number: i32, func: Box<SourceSignalFn>) {
+        (self.add_signal)(self, signal_number, func)
+    }
+
+    pub fn destroy_source(&self, source: &mut CSource) {
+        (self.destroy_source)(self, source)
+    }
+}
+
+impl Interface for LoopUtilsImpl {
+    unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
+        crate::support::ffi::r#loop::loop_utils_make_native(self)
+    }
+
+    unsafe fn free_native(loop_: *mut super::ffi::CInterface) {
+        crate::support::ffi::r#loop::loop_utils_free_native(loop_)
     }
 }
