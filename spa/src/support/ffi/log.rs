@@ -162,9 +162,9 @@ impl CLogImpl {
         func: &CStr,
         args: std::fmt::Arguments,
     ) {
-        if topic.has_custom_level && level > topic.level {
-            return;
-        } else if !topic.has_custom_level && level > this.level {
+        if (topic.has_custom_level && level > topic.level)
+            || (!topic.has_custom_level && level > this.level)
+        {
             return;
         }
 
