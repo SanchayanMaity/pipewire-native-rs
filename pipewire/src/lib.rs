@@ -73,7 +73,7 @@ pub fn init() {
         let _ = std::env::var("PIPEWIRE_CPU").map(|v| {
             cpu_info.set(spa::interface::cpu::FORCE, v);
         });
-        let _ = std::env::var("PIPEWIRE_VN").map(|v| {
+        let _ = std::env::var("PIPEWIRE_VM").map(|v| {
             cpu_info.set(spa::interface::cpu::VM, v);
         });
 
