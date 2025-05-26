@@ -91,5 +91,9 @@ pub trait Handle {
     fn version(&self) -> u32;
 
     /* Methods */
+    /* FIXME: The interface implicitly depends on the Handle, and we likely should express that as
+     * a lifetime dependency between the Handle and the Interface. We could also return a
+     * reference, but then the caller might have to perform some shenanigans to keep both the
+     * handle and a reference to something from the handle around. */
     fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>>;
 }
