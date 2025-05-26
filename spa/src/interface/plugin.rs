@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::any::Any;
+use std::{any::TypeId, pin::Pin, rc::Rc};
 
 use crate::dict::Dict;
 
@@ -12,11 +12,59 @@ pub const LOG_FACTORY: &str = "support.log";
 pub const SYSTEM_FACTORY: &str = "support.system";
 pub const CPU_FACTORY: &str = "support.cpu";
 
-pub trait Interface: Any {
+pub trait Interface {
     unsafe fn make_native(&self) -> *mut CInterface;
     unsafe fn free_native(cpu: *mut CInterface)
     where
         Self: Sized;
+
+    fn type_id(&self) -> TypeId
+    where
+        Self: 'static,
+    {
+        TypeId::of::<Self>()
+    }
+}
+
+impl std::fmt::Debug for dyn Interface {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Interface")
+            .field("type_id", &self.type_id())
+            .finish()
+    }
+}
+
+impl dyn Interface {
+    pub fn is<T>(&self) -> bool
+    where
+        T: 'static,
+    {
+        TypeId::of::<T>() == self.type_id()
+    }
+
+    pub fn downcast_box<T>(self: Box<Self>) -> Result<Box<T>, Box<Self>>
+    where
+        T: 'static,
+    {
+        if self.is::<T>() {
+            Ok(unsafe { Box::from_raw(Box::into_raw(self) as *mut T) })
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn downcast_rc_pin_box<T>(
+        self: Rc<Pin<Box<Self>>>,
+    ) -> Result<Rc<Pin<Box<T>>>, Rc<Pin<Box<Self>>>>
+    where
+        T: 'static,
+    {
+        if self.is::<T>() {
+            Ok(unsafe { Rc::from_raw(Rc::into_raw(self) as *mut Pin<Box<T>>) })
+        } else {
+            Err(self)
+        }
+    }
 }
 
 pub struct InterfaceInfo {

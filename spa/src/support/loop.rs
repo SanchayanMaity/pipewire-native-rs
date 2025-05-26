@@ -30,9 +30,7 @@ impl Loop {
             .unwrap()
             .get_interface(interface::SYSTEM)
             .unwrap();
-        let system = (system_iface as Box<dyn Any>)
-            .downcast::<SystemImpl>()
-            .unwrap();
+        let system = system_iface.downcast_box::<SystemImpl>().unwrap();
         let pollfd = system.pollfd_create(system::POLLFD_CLOEXEC)?;
 
         Ok(LoopImpl {

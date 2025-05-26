@@ -158,7 +158,7 @@ impl HandleFactory for CHandleFactoryImpl {
 pub struct CHandle {
     pub version: u32,
     pub get_interface:
-        fn(handle: *const CHandle, type_: *const c_char, iface: *const *mut CInterface) -> c_int,
+        fn(handle: *const CHandle, type_: *const c_char, iface: *mut *mut CInterface) -> c_int,
     pub clear: fn(handle: *mut CHandle) -> c_int,
 }
 
@@ -181,13 +181,13 @@ impl Handle for CHandleImpl {
     }
 
     fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>> {
-        let iface: *mut CInterface = std::ptr::null_mut();
+        let mut iface: *mut CInterface = std::ptr::null_mut();
 
         unsafe {
             (self.handle.as_ref().unwrap().get_interface)(
                 self.handle,
                 c_string(type_).as_ptr(),
-                &iface,
+                &mut iface,
             )
         };
 

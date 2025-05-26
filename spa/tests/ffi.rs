@@ -45,8 +45,8 @@ fn test_load_support() {
         .get_interface(interface::LOG)
         .expect("Log factory should produce an interface");
 
-    let log = (log_iface as Box<dyn std::any::Any>)
-        .downcast::<LogImpl>()
+    let log = log_iface
+        .downcast_box::<LogImpl>()
         .expect("Log interface should be a LogImpl");
 
     let log_topic = interface::log::LogTopic {
@@ -81,8 +81,8 @@ fn test_load_support() {
         .get_interface(interface::SYSTEM)
         .expect("System factory should produce an interface");
 
-    let system = (system_iface as Box<dyn std::any::Any>)
-        .downcast::<SystemImpl>()
+    let system = system_iface
+        .downcast_box::<SystemImpl>()
         .expect("System interface should be a SystemImpl");
 
     support.add_interface(interface::SYSTEM, system);
@@ -102,8 +102,8 @@ fn test_load_support() {
         .get_interface(interface::CPU)
         .expect("CPU factory should produce an interface");
 
-    let cpu = (cpu_iface as Box<dyn std::any::Any>)
-        .downcast::<CpuImpl>()
+    let cpu = cpu_iface
+        .downcast_box::<CpuImpl>()
         .expect("CPU interface should be a CpuImpl");
 
     support.add_interface(interface::CPU, cpu);
