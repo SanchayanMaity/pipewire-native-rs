@@ -14,10 +14,11 @@ macro_rules! cstr {
 #[macro_export]
 macro_rules! define_topic {
     ($name:ident, $topic:literal) => {
+        // We store the topic and name as a tuple of (name, topic)
         pub static $name: (
-            ::std::sync::OnceLock<::pipewire_native_spa::interface::log::LogTopic>,
             &str,
-        ) = (::std::sync::OnceLock::new(), concat!($topic, "\0"));
+            ::std::sync::OnceLock<::pipewire_native_spa::interface::log::LogTopic>,
+        ) = (concat!($topic, "\0"), ::std::sync::OnceLock::new());
     };
 }
 
@@ -31,14 +32,14 @@ pub(crate) mod topic {
     pub fn init(levels: &[(String, spa::interface::log::LogLevel)]) {
         for topic in [&CONF, &CONTEXT, &SUPPORT] {
             // TODO: implement glob matching
-            let pattern = levels.iter().find(|v| v.0 == topic.1);
+            let pattern = levels.iter().find(|v| v.0 == topic.0);
             let (level, has_custom_level) = match pattern {
-                Some(&(ref pat, level)) if pat == topic.1 => (level, true),
+                Some(&(ref pat, level)) if pat == topic.0 => (level, true),
                 _ => (spa::interface::log::LogLevel::Warn, false),
             };
 
-            let _ = topic.0.set(spa::interface::log::LogTopic {
-                topic: std::ffi::CStr::from_bytes_with_nul(topic.1.as_bytes()).unwrap(),
+            let _ = topic.1.set(spa::interface::log::LogTopic {
+                topic: std::ffi::CStr::from_bytes_with_nul(topic.0.as_bytes()).unwrap(),
                 level,
                 has_custom_level,
             });
@@ -51,7 +52,7 @@ macro_rules! default_topic {
     ($name:expr) => {
         static DEFAULT_TOPIC: ::std::sync::LazyLock<
             &::pipewire_native_spa::interface::log::LogTopic,
-        > = ::std::sync::LazyLock::new(|| $name.0.get().unwrap());
+        > = ::std::sync::LazyLock::new(|| $name.1.get().unwrap());
     };
 }
 
