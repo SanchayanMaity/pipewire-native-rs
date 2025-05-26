@@ -24,6 +24,9 @@ pub fn init() {
     GLOBAL_SUPPORT.get_or_init(|| {
         let mut support = Support::new();
 
+        let levels = log::parse_levels(std::env::var("PIPEWIRE_DEBUG").ok().as_deref());
+        log::topic::init(&levels);
+
         // First, initialise logging
         let mut log_info = Properties::new();
         log_info.set(
@@ -45,10 +48,13 @@ pub fn init() {
         let _ = std::env::var("PIPEWIRE_LOG").map(|v| {
             log_info.set(spa::interface::log::FILE, v);
         });
-        let _ = std::env::var("PIPEWIRE_DEBUG").map(|v| {
-            // FIXME: parse the level first
-            log_info.set(spa::interface::log::LEVEL, v);
-        });
+
+        // Initialise to the global default as parsed (if not specified, parse_levels() always
+        // provides a default
+        log_info.set(
+            spa::interface::log::LEVEL,
+            format!("{}", levels.iter().find(|v| v.0 == "").unwrap().1 as u32),
+        );
 
         // TODO: Check for/load the systemd logger if PIPEWIRE_SYSTEMD is set
         support
