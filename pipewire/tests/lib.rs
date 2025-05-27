@@ -7,6 +7,8 @@ use pipewire_native::{self as pipewire, properties::Properties};
 #[test]
 fn test_lib() {
     pipewire::init();
+
     let context = pipewire::context::Context::new(Properties::new());
+
     assert!(context.is_ok());
 }

@@ -77,6 +77,15 @@ impl Support {
             .expect("Log interface should be initialized")
     }
 
+    pub fn cpu(&self) -> Rc<Pin<Box<spa::interface::cpu::CpuImpl>>> {
+        let inner = self.inner.lock().unwrap();
+
+        inner
+            .support
+            .get_interface::<spa::interface::cpu::CpuImpl>(spa::interface::CPU)
+            .unwrap()
+    }
+
     pub fn load_spa_handle(
         &mut self,
         lib: Option<&str>,

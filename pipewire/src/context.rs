@@ -6,10 +6,13 @@ use std::{ffi::CStr, sync::LazyLock};
 
 use crate::{conf, debug, default_topic, keys, log, properties::Properties};
 
+use pipewire_native_spa as spa;
+
 default_topic!(log::topic::CONTEXT);
 
 pub struct Context {
     properties: Properties,
+    conf: Properties,
 }
 
 static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
@@ -27,12 +30,44 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 
 impl Context {
     pub fn new(properties: Properties) -> std::io::Result<Self> {
-        let mut this = Context { properties };
+        let mut this = Context {
+            properties,
+            conf: Properties::new(),
+        };
 
         debug!("Creating context");
 
         this.set_default_properties();
         this.load_conf()?;
+
+        let cpu = super::GLOBAL_SUPPORT.get().map(|v| v.cpu());
+        let vm_type = match &cpu {
+            Some(cpu) => cpu.get_vm_type(),
+            None => spa::interface::cpu::CpuVm::None,
+        };
+
+        if vm_type != spa::interface::cpu::CpuVm::None {
+            this.properties.set("cpu.vm.name", vm_type.to_string());
+        }
+
+        // TODO: add overrides and rules from context.properties
+
+        if let Ok(core_name) = std::env::var("PIPEWIRE_CORE") {
+            this.properties.set(keys::CORE_NAME, core_name);
+        }
+
+        if let Some(cpu) = &cpu {
+            if this.properties.get(keys::CPU_MAX_ALIGN).is_none() {
+                this.properties
+                    .set(keys::CPU_MAX_ALIGN, cpu.get_max_align().to_string());
+            }
+        }
+
+        if this.properties.get_bool("mem.mlock-all").unwrap_or(false) {
+            unsafe {
+                libc::mlockall(libc::MCL_CURRENT | libc::MCL_FUTURE);
+            }
+        }
 
         Ok(this)
     }
@@ -48,7 +83,7 @@ impl Context {
             .and_then(|s| if s == "client-rt.conf" { None } else { Some(s) })
             .unwrap_or("client.conf".to_string());
 
-        conf::load(conf_prefix.as_deref(), &conf_name, &mut self.properties)?;
+        conf::load(conf_prefix.as_deref(), &conf_name, &mut self.conf)?;
 
         // TODO: overrides
 
