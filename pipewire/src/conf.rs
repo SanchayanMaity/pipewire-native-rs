@@ -98,13 +98,46 @@ fn get_config_path(prefix: Option<&str>, name: &str) -> std::io::Result<PathBuf>
     get_configdir_path(&config_path).or_else(|_| get_configdatadir_path(&config_path))
 }
 
+fn spa_json_parse(config: &str) -> std::io::Result<String> {
+    // FIXME: GIANT HACK ALERT. Because we do not parse SPA JSON yet, we pass the config through
+    // the spa-json-dump tool so we get valid JSON to work with.
+    use std::process::Command;
+
+    let output = Command::new("spa-json-dump")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            child.stdin.as_mut().unwrap().write_all(config.as_bytes())?;
+            child.wait_with_output()
+        })?;
+
+    if !output.status.success() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("spa-json-dump failed with status: {}", output.status),
+        ));
+    }
+
+    let json_output = String::from_utf8(output.stdout).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("spa-json-dump output is not valid UTF-8: {e}"),
+        )
+    })?;
+
+    Ok(json_output)
+}
+
 fn read_file(path: &PathBuf, properties: &mut Properties) -> std::io::Result<()> {
     debug!("Reading config file: {}", path.display());
 
     if let Ok(config) = std::fs::read(path) {
         match std::str::from_utf8(&config) {
             Ok(config_str) => {
-                properties.update_string(config_str).map_err(|err| {
+                let spa_json_str = spa_json_parse(config_str)?;
+                properties.update_string(&spa_json_str).map_err(|err| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
                         format!("Could not update properties from config: {err}"),
