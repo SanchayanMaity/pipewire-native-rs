@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use crate::interface::ffi::{CControlHooks, CHook, CSource};
+use crate::interface::ffi::{CControlHooks, CHook};
 use std::{any::Any, os::fd::RawFd, pin::Pin};
 
 use super::plugin::Interface;
@@ -120,35 +120,17 @@ pub type SourceEventFn = dyn FnMut(u64) + 'static;
 pub type SourceTimerFn = dyn FnMut(u64) + 'static;
 pub type SourceSignalFn = dyn FnMut(i32) + 'static;
 
-pub enum LoopUtilsSourceCb {
-    Io(Box<dyn Any>),
-    Idle(Box<dyn Any>),
-    Event(Box<dyn Any>),
-    Timer(Box<dyn Any>),
-    Signal(Box<dyn Any>),
+pub(crate) enum LoopUtilsSourceCb {
+    Io(Box<SourceIoFn>),
+    Idle(Box<SourceIdleFn>),
+    Event(Box<SourceEventFn>),
+    Timer(Box<SourceTimerFn>),
+    Signal(Box<SourceSignalFn>),
 }
 
-pub enum LoopSourceType {
-    Io,
-    Idle,
-    Event,
-    Timer,
-    Signal,
-}
-
-pub struct LoopSource {
-    pub stype: LoopSourceType,
-    pub source: CSource,
-}
-
-impl LoopSource {
-    pub fn new(stype: LoopSourceType, source: CSource) -> Self {
-        Self { stype, source }
-    }
-
-    pub fn source(&mut self) -> &mut CSource {
-        &mut self.source
-    }
+pub struct LoopUtilsSource {
+    pub(crate) cb: LoopUtilsSourceCb,
+    pub(crate) inner: *mut std::ffi::c_void,
 }
 
 pub struct LoopUtilsImpl {
@@ -160,23 +142,34 @@ pub struct LoopUtilsImpl {
         mask: u32,
         close: bool,
         func: Box<SourceIoFn>,
-    ) -> Option<LoopSource>,
-    pub update_io: fn(&LoopUtilsImpl, source: &mut LoopSource, mask: u32) -> i32,
-    pub add_idle: fn(&LoopUtilsImpl, enabled: bool, func: Box<SourceIdleFn>) -> Option<LoopSource>,
-    pub enable_idle: fn(&LoopUtilsImpl, source: &mut LoopSource, enabled: bool) -> i32,
-    pub add_event: fn(&LoopUtilsImpl, func: Box<SourceEventFn>) -> Option<LoopSource>,
-    pub signal_event: fn(&LoopUtilsImpl, source: &mut LoopSource) -> i32,
-    pub add_timer: fn(&LoopUtilsImpl, func: Box<SourceTimerFn>) -> Option<LoopSource>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>>,
+    pub update_io:
+        fn(&LoopUtilsImpl, source: &mut LoopUtilsSource, mask: u32) -> std::io::Result<i32>,
+    pub add_idle: fn(
+        &LoopUtilsImpl,
+        enabled: bool,
+        func: Box<SourceIdleFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>>,
+    pub enable_idle:
+        fn(&LoopUtilsImpl, source: &mut LoopUtilsSource, enabled: bool) -> std::io::Result<i32>,
+    pub add_event:
+        fn(&LoopUtilsImpl, func: Box<SourceEventFn>) -> Option<Pin<Box<LoopUtilsSource>>>,
+    pub signal_event: fn(&LoopUtilsImpl, source: &mut LoopUtilsSource) -> std::io::Result<i32>,
+    pub add_timer:
+        fn(&LoopUtilsImpl, func: Box<SourceTimerFn>) -> Option<Pin<Box<LoopUtilsSource>>>,
     pub update_timer: fn(
         &LoopUtilsImpl,
-        source: &mut LoopSource,
+        source: &mut LoopUtilsSource,
         value: &libc::timespec,
         interval: &libc::timespec,
         absolute: bool,
-    ) -> i32,
-    pub add_signal:
-        fn(&LoopUtilsImpl, signal_number: i32, func: Box<SourceSignalFn>) -> Option<LoopSource>,
-    pub destroy_source: fn(&LoopUtilsImpl, source: LoopSource),
+    ) -> std::io::Result<i32>,
+    pub add_signal: fn(
+        &LoopUtilsImpl,
+        signal_number: i32,
+        func: Box<SourceSignalFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>>,
+    pub destroy_source: fn(&LoopUtilsImpl, source: LoopUtilsSource),
 }
 
 impl LoopUtilsImpl {
@@ -186,49 +179,57 @@ impl LoopUtilsImpl {
         mask: u32,
         close: bool,
         func: Box<SourceIoFn>,
-    ) -> Option<LoopSource> {
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
         (self.add_io)(self, fd, mask, close, func)
     }
 
-    pub fn update_io(&self, source: &mut LoopSource, mask: u32) -> i32 {
+    pub fn update_io(&self, source: &mut LoopUtilsSource, mask: u32) -> std::io::Result<i32> {
         (self.update_io)(self, source, mask)
     }
 
-    pub fn add_idle(&self, enabled: bool, func: Box<SourceIdleFn>) -> Option<LoopSource> {
+    pub fn add_idle(
+        &self,
+        enabled: bool,
+        func: Box<SourceIdleFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
         (self.add_idle)(self, enabled, func)
     }
 
-    pub fn enable_idle(&self, source: &mut LoopSource, enabled: bool) -> i32 {
+    pub fn enable_idle(&self, source: &mut LoopUtilsSource, enabled: bool) -> std::io::Result<i32> {
         (self.enable_idle)(self, source, enabled)
     }
 
-    pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<LoopSource> {
+    pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
         (self.add_event)(self, func)
     }
 
-    pub fn signal_event(&self, source: &mut LoopSource) -> i32 {
+    pub fn signal_event(&self, source: &mut LoopUtilsSource) -> std::io::Result<i32> {
         (self.signal_event)(self, source)
     }
 
-    pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<LoopSource> {
+    pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
         (self.add_timer)(self, func)
     }
 
     pub fn update_timer(
         &self,
-        source: &mut LoopSource,
+        source: &mut LoopUtilsSource,
         value: &libc::timespec,
         interval: &libc::timespec,
         absolute: bool,
-    ) -> i32 {
+    ) -> std::io::Result<i32> {
         (self.update_timer)(self, source, value, interval, absolute)
     }
 
-    pub fn add_signal(&self, signal_number: i32, func: Box<SourceSignalFn>) -> Option<LoopSource> {
+    pub fn add_signal(
+        &self,
+        signal_number: i32,
+        func: Box<SourceSignalFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
         (self.add_signal)(self, signal_number, func)
     }
 
-    pub fn destroy_source(&self, source: LoopSource) {
+    pub fn destroy_source(&self, source: LoopUtilsSource) {
         (self.destroy_source)(self, source)
     }
 }

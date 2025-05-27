@@ -70,15 +70,15 @@ struct CSourceImpl {
     func: Box<SourceFn>,
 }
 
-impl CLoopImpl {
-    fn result_from(res: i32) -> std::io::Result<i32> {
-        if res >= 0 {
-            Ok(0)
-        } else {
-            Err(std::io::Error::from_raw_os_error(-res))
-        }
+fn result_from(res: i32) -> std::io::Result<i32> {
+    if res >= 0 {
+        Ok(0)
+    } else {
+        Err(std::io::Error::from_raw_os_error(-res))
     }
+}
 
+impl CLoopImpl {
     fn from_loop(this: &LoopImpl) -> (&mut CLoopImpl, &mut CLoop) {
         let c_loopimpl = unsafe {
             this.inner
@@ -136,7 +136,7 @@ impl CLoopImpl {
             .sources
             .insert(source_impl.c_source.fd, source_impl);
 
-        Self::result_from((funcs.add_source)(c_loop.iface.cb.data, c_source))
+        result_from((funcs.add_source)(c_loop.iface.cb.data, c_source))
     }
 
     fn update_source(loop_: &mut LoopImpl, source: &Source) -> std::io::Result<i32> {
@@ -154,7 +154,7 @@ impl CLoopImpl {
 
         source_impl.c_source.mask = source.mask;
 
-        Self::result_from((funcs.update_source)(
+        result_from((funcs.update_source)(
             c_loop.iface.cb.data,
             &mut source_impl.c_source as *mut CSource,
         ))
@@ -173,7 +173,7 @@ impl CLoopImpl {
             .remove(&fd)
             .ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?;
 
-        Self::result_from((funcs.remove_source)(
+        result_from((funcs.remove_source)(
             c_loop.iface.cb.data,
             &mut source_impl.c_source as *mut CSource,
         ))
@@ -211,7 +211,7 @@ impl CLoopImpl {
         };
         let mut invoke_func = Box::pin(func);
 
-        Self::result_from((funcs.invoke)(
+        result_from((funcs.invoke)(
             c_loop.iface.cb.data,
             Self::invoke_trampoline,
             seq,
@@ -576,14 +576,12 @@ struct CLoopUtils {
 
 struct CLoopUtilsImpl {
     iface: *mut CLoopUtils,
-    sources: HashMap<RawFd, LoopUtilsSourceCb>,
 }
 
 pub fn loop_utils_new_impl(interface: *mut CInterface) -> LoopUtilsImpl {
     LoopUtilsImpl {
         inner: Box::pin(CLoopUtilsImpl {
             iface: interface as *mut CLoopUtils,
-            sources: HashMap::new(),
         }),
 
         add_io: CLoopUtilsImpl::add_io,
@@ -616,7 +614,12 @@ impl CLoopUtilsImpl {
 
     #[no_mangle]
     extern "C" fn source_io_trampoline(data: *mut c_void, fd: c_int, mask: c_uint) {
-        let func = unsafe { (data as *mut Box<SourceIoFn>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+
+        let func = match source.cb {
+            LoopUtilsSourceCb::Io(ref mut f) => f,
+            _ => panic!("source_io_trampoline called with non-IO source"),
+        };
 
         (func)(fd, mask)
     }
@@ -627,47 +630,54 @@ impl CLoopUtilsImpl {
         mask: u32,
         close: bool,
         func: Box<SourceIoFn>,
-    ) -> Option<LoopSource> {
-        unsafe {
-            let (utils_impl, utils) = Self::from_loop_utils(this);
-            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
-            let func_raw = Box::into_raw(func);
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        let (_, utils) = Self::from_loop_utils(this);
+        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
-            utils_impl
-                .sources
-                .insert(fd, LoopUtilsSourceCb::Io(Box::new(func_raw)));
+        let mut source = Box::pin(LoopUtilsSource {
+            cb: LoopUtilsSourceCb::Io(func),
+            inner: std::ptr::null_mut(),
+        });
 
-            let csource = ((*funcs).add_io)(
+        let c_source = unsafe {
+            ((*funcs).add_io)(
                 utils.iface.cb.data,
                 fd,
                 mask,
                 close,
                 Self::source_io_trampoline,
-                func_raw as *mut c_void,
-            );
+                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+            )
+        };
 
-            if csource.is_null() {
-                return None;
-            }
-            let csource = (*csource).clone();
-
-            Some(LoopSource::new(LoopSourceType::Io, csource))
+        if c_source.is_null() {
+            None
+        } else {
+            source.inner = c_source as *mut c_void;
+            Some(source)
         }
     }
 
-    fn update_io(this: &LoopUtilsImpl, source: &mut LoopSource, mask: u32) -> i32 {
-        unsafe {
-            let utils_impl = Self::from_loop_utils(this).1;
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let source = source.source();
+    fn update_io(
+        this: &LoopUtilsImpl,
+        source: &mut LoopUtilsSource,
+        mask: u32,
+    ) -> std::io::Result<i32> {
+        let utils_impl = Self::from_loop_utils(this).1;
+        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let source = source.inner as *mut CSource;
 
-            ((*funcs).update_io)(utils_impl.iface.cb.data, source, mask)
-        }
+        result_from(unsafe { ((*funcs).update_io)(utils_impl.iface.cb.data, source, mask) })
     }
 
     #[no_mangle]
     extern "C" fn source_idle_trampoline(data: *mut c_void) {
-        let func = unsafe { (data as *mut Box<SourceIdleFn>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+
+        let func = match source.cb {
+            LoopUtilsSourceCb::Idle(ref mut f) => f,
+            _ => panic!("source_idle_trampoline called with non-idle source"),
+        };
 
         (func)()
     }
@@ -676,135 +686,156 @@ impl CLoopUtilsImpl {
         this: &LoopUtilsImpl,
         enabled: bool,
         func: Box<SourceIdleFn>,
-    ) -> Option<LoopSource> {
-        unsafe {
-            let (utils_impl, utils) = Self::from_loop_utils(this);
-            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
-            let func_raw = Box::into_raw(func);
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        let (_, utils) = Self::from_loop_utils(this);
+        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
-            let csource = ((*funcs).add_idle)(
+        let mut source = Box::pin(LoopUtilsSource {
+            cb: LoopUtilsSourceCb::Idle(func),
+            inner: std::ptr::null_mut(),
+        });
+
+        let c_source = unsafe {
+            ((*funcs).add_idle)(
                 utils.iface.cb.data,
                 enabled,
                 Self::source_idle_trampoline,
-                func_raw as *mut c_void,
-            );
+                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+            )
+        };
 
-            if csource.is_null() {
-                return None;
-            }
-            let csource = (*csource).clone();
-
-            utils_impl
-                .sources
-                .insert(csource.fd, LoopUtilsSourceCb::Idle(Box::new(func_raw)));
-
-            Some(LoopSource::new(LoopSourceType::Idle, csource))
+        if c_source.is_null() {
+            None
+        } else {
+            source.inner = c_source as *mut c_void;
+            Some(source)
         }
     }
 
-    fn enable_idle(this: &LoopUtilsImpl, source: &mut LoopSource, enabled: bool) -> i32 {
-        unsafe {
-            let utils_impl = Self::from_loop_utils(this).1;
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let source = source.source();
+    fn enable_idle(
+        this: &LoopUtilsImpl,
+        source: &mut LoopUtilsSource,
+        enabled: bool,
+    ) -> std::io::Result<i32> {
+        let utils_impl = Self::from_loop_utils(this).1;
+        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let source = source.inner as *mut CSource;
 
-            ((*funcs).enable_idle)(utils_impl.iface.cb.data, source, enabled)
-        }
+        result_from(unsafe { ((*funcs).enable_idle)(utils_impl.iface.cb.data, source, enabled) })
     }
 
     #[no_mangle]
     extern "C" fn source_event_trampoline(data: *mut c_void, count: c_ulong) {
-        let func = unsafe { (data as *mut Box<SourceEventFn>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+
+        let func = match source.cb {
+            LoopUtilsSourceCb::Event(ref mut f) => f,
+            _ => panic!("source_event_trampoline called with non-event source"),
+        };
 
         (func)(count)
     }
 
-    fn add_event(this: &LoopUtilsImpl, func: Box<SourceEventFn>) -> Option<LoopSource> {
-        unsafe {
-            let (utils_impl, utils) = Self::from_loop_utils(this);
-            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
-            let func_raw = Box::into_raw(func);
+    fn add_event(
+        this: &LoopUtilsImpl,
+        func: Box<SourceEventFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        let (_, utils) = Self::from_loop_utils(this);
+        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
-            let csource = ((*funcs).add_event)(
+        let mut source = Box::pin(LoopUtilsSource {
+            cb: LoopUtilsSourceCb::Event(func),
+            inner: std::ptr::null_mut(),
+        });
+
+        let c_source = unsafe {
+            ((*funcs).add_event)(
                 utils.iface.cb.data,
                 Self::source_event_trampoline,
-                func_raw as *mut c_void,
-            );
+                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+            )
+        };
 
-            if csource.is_null() {
-                return None;
-            }
-            let csource = (*csource).clone();
-
-            utils_impl
-                .sources
-                .insert(csource.fd, LoopUtilsSourceCb::Event(Box::new(func_raw)));
-
-            Some(LoopSource::new(LoopSourceType::Event, csource))
+        if c_source.is_null() {
+            None
+        } else {
+            source.inner = c_source as *mut c_void;
+            Some(source)
         }
     }
 
-    fn signal_event(this: &LoopUtilsImpl, source: &mut LoopSource) -> i32 {
-        unsafe {
-            let utils_impl = Self::from_loop_utils(this).1;
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let source = source.source();
+    fn signal_event(this: &LoopUtilsImpl, source: &mut LoopUtilsSource) -> std::io::Result<i32> {
+        let utils_impl = Self::from_loop_utils(this).1;
+        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let source = source.inner as *mut CSource;
 
-            ((*funcs).signal_event)(utils_impl.iface.cb.data, source)
-        }
+        result_from(unsafe { ((*funcs).signal_event)(utils_impl.iface.cb.data, source) })
     }
 
     #[no_mangle]
     extern "C" fn source_timer_trampoline(data: *mut c_void, expirations: c_ulong) {
-        let func = unsafe { (data as *mut Box<SourceTimerFn>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+
+        let func = match source.cb {
+            LoopUtilsSourceCb::Timer(ref mut f) => f,
+            _ => panic!("source_timer_trampoline called with non-timer source"),
+        };
 
         (func)(expirations)
     }
 
-    fn add_timer(this: &LoopUtilsImpl, func: Box<SourceTimerFn>) -> Option<LoopSource> {
-        unsafe {
-            let (utils_impl, utils) = Self::from_loop_utils(this);
-            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
-            let func_raw = Box::into_raw(func);
+    fn add_timer(
+        this: &LoopUtilsImpl,
+        func: Box<SourceTimerFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        let (_, utils) = Self::from_loop_utils(this);
+        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
-            let csource = ((*funcs).add_timer)(
+        let mut source = Box::pin(LoopUtilsSource {
+            cb: LoopUtilsSourceCb::Timer(func),
+            inner: std::ptr::null_mut(),
+        });
+
+        let c_source = unsafe {
+            ((*funcs).add_timer)(
                 utils.iface.cb.data,
                 Self::source_timer_trampoline,
-                func_raw as *mut c_void,
-            );
+                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+            )
+        };
 
-            if csource.is_null() {
-                return None;
-            }
-            let csource = (*csource).clone();
-
-            utils_impl
-                .sources
-                .insert(csource.fd, LoopUtilsSourceCb::Timer(Box::new(func_raw)));
-
-            Some(LoopSource::new(LoopSourceType::Timer, csource))
+        if c_source.is_null() {
+            None
+        } else {
+            source.inner = c_source as *mut c_void;
+            Some(source)
         }
     }
 
     fn update_timer(
         this: &LoopUtilsImpl,
-        source: &mut LoopSource,
+        source: &mut LoopUtilsSource,
         value: &libc::timespec,
         interval: &libc::timespec,
         absolute: bool,
-    ) -> i32 {
-        unsafe {
-            let utils_impl = Self::from_loop_utils(this).1;
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let source = source.source();
+    ) -> std::io::Result<i32> {
+        let utils_impl = Self::from_loop_utils(this).1;
+        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let source = source.inner as *mut CSource;
 
+        result_from(unsafe {
             ((*funcs).update_timer)(utils_impl.iface.cb.data, source, value, interval, absolute)
-        }
+        })
     }
 
     #[no_mangle]
     extern "C" fn source_signal_trampoline(data: *mut c_void, signal_number: c_int) {
-        let func = unsafe { (data as *mut Box<SourceSignalFn>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+
+        let func = match source.cb {
+            LoopUtilsSourceCb::Signal(ref mut f) => f,
+            _ => panic!("source_signal_trampoline called with non-signal source"),
+        };
 
         (func)(signal_number)
     }
@@ -813,91 +844,39 @@ impl CLoopUtilsImpl {
         this: &LoopUtilsImpl,
         signal_number: i32,
         func: Box<SourceSignalFn>,
-    ) -> Option<LoopSource> {
-        unsafe {
-            let (utils_impl, utils) = Self::from_loop_utils(this);
-            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
-            let func_raw = Box::into_raw(func);
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        let (_, utils) = Self::from_loop_utils(this);
+        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
-            let csource = ((*funcs).add_signal)(
+        let mut source = Box::pin(LoopUtilsSource {
+            cb: LoopUtilsSourceCb::Signal(func),
+            inner: std::ptr::null_mut(),
+        });
+
+        let c_source = unsafe {
+            ((*funcs).add_signal)(
                 utils.iface.cb.data,
                 signal_number,
                 Self::source_signal_trampoline,
-                func_raw as *mut c_void,
-            );
+                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+            )
+        };
 
-            if csource.is_null() {
-                return None;
-            }
-            let csource = (*csource).clone();
-
-            utils_impl
-                .sources
-                .insert(csource.fd, LoopUtilsSourceCb::Signal(Box::new(func_raw)));
-
-            Some(LoopSource::new(LoopSourceType::Signal, csource))
+        if c_source.is_null() {
+            None
+        } else {
+            source.inner = c_source as *mut c_void;
+            Some(source)
         }
     }
 
-    fn destroy_source(this: &LoopUtilsImpl, mut source: LoopSource) {
+    fn destroy_source(this: &LoopUtilsImpl, source: LoopUtilsSource) {
+        let (_, utils) = Self::from_loop_utils(this);
+        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+        let c_source = source.inner as *mut CSource;
+
         unsafe {
-            let (utils_impl, utils) = Self::from_loop_utils(this);
-            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
-            let src = source.source();
-
-            if let Some(r) = utils_impl.sources.remove(&src.fd) {
-                match r {
-                    LoopUtilsSourceCb::Io(io_cb) => {
-                        let cb = io_cb
-                            .as_ref()
-                            .downcast_ref::<*mut SourceIoFn>()
-                            .unwrap()
-                            .as_mut()
-                            .unwrap();
-                        let _ = Box::<SourceIoFn>::from_raw(cb as *mut _);
-                    }
-                    LoopUtilsSourceCb::Idle(idle_cb) => {
-                        let cb = idle_cb
-                            .as_ref()
-                            .downcast_ref::<*mut SourceIdleFn>()
-                            .unwrap()
-                            .as_mut()
-                            .unwrap();
-                        let _ = Box::<SourceIdleFn>::from_raw(cb as *mut _);
-                    }
-                    LoopUtilsSourceCb::Event(event_cb) => {
-                        let cb = event_cb
-                            .as_ref()
-                            .downcast_ref::<*mut SourceEventFn>()
-                            .unwrap()
-                            .as_mut()
-                            .unwrap();
-                        let _ = Box::<SourceEventFn>::from_raw(cb as *mut _);
-                    }
-                    LoopUtilsSourceCb::Timer(timer_cb) => {
-                        let cb = timer_cb
-                            .as_ref()
-                            .downcast_ref::<*mut SourceTimerFn>()
-                            .unwrap()
-                            .as_mut()
-                            .unwrap();
-                        let _ = Box::<SourceTimerFn>::from_raw(cb as *mut _);
-                    }
-                    LoopUtilsSourceCb::Signal(signal_cb) => {
-                        let cb = signal_cb
-                            .as_ref()
-                            .downcast_ref::<*mut SourceSignalFn>()
-                            .unwrap()
-                            .as_mut()
-                            .unwrap();
-                        let _ = Box::<SourceSignalFn>::from_raw(cb as *mut _);
-                    }
-                }
-            }
-
-            ((*funcs).destroy_source)(utils.iface.cb.data, src);
-
-            let _ = src;
+            ((*funcs).destroy_source)(utils.iface.cb.data, c_source);
         }
     }
 }
@@ -919,7 +898,7 @@ impl CLoopUtilsImpl {
 //     ) -> *mut CSource {
 //         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
 //
-//         let Some(LoopSource {
+//         let Some(LoopUtilsSource {
 //             stype: _,
 //             source: mut csource,
 //         }) = loop_utils_impl.add_io(
@@ -938,7 +917,7 @@ impl CLoopUtilsImpl {
 //     extern "C" fn update_io(object: *mut c_void, source: *mut CSource, mask: u32) -> i32 {
 //         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
 //         let c_source = unsafe { source.as_mut().unwrap() as CSource };
-//         let mut lsrc = LoopSource::new(LoopSourceType::Io, c_source);
+//         let mut lsrc = LoopUtilsSource::new(LoopUtilsSourceType::Io, c_source);
 //
 //         loop_utils_impl.update_io(&lsrc, mask)
 //     }
