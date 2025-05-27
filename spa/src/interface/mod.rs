@@ -28,7 +28,7 @@ pub mod system;
 pub const LOG: &str = "Spa:Pointer:Interface:Log";
 pub const LOOP: &str = "Spa:Pointer:Interface:Loop";
 pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
-pub const CPU: &str = "Spa:Pointer:Interface:Cpu";
+pub const CPU: &str = "Spa:Pointer:Interface:CPU";
 
 pub struct Support {
     supports: HashMap<&'static str, Rc<Pin<Box<dyn plugin::Interface>>>>,

@@ -191,6 +191,10 @@ impl Handle for CHandleImpl {
             )
         };
 
+        if iface.is_null() {
+            return None;
+        }
+
         match type_ {
             interface::CPU => Some(Box::new(cpu::new_impl(iface))),
             interface::LOG => Some(Box::new(log::new_impl(iface))),

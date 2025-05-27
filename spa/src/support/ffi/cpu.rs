@@ -57,7 +57,7 @@ impl CCpuImpl {
         unsafe {
             this.inner
                 .as_ref()
-                .downcast_ref::<*const CCpu>()
+                .downcast_ref::<*mut CCpu>()
                 .unwrap()
                 .as_ref()
                 .unwrap()
