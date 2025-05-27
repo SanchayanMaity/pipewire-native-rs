@@ -62,6 +62,7 @@ pub struct CLoop {
 }
 
 #[repr(C)]
+#[derive(Clone)]
 pub struct CSource {
     /*
      * this should be *mut, but mutable dererefence via dyn Any

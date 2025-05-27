@@ -540,27 +540,33 @@ struct CLoopUtilsMethods {
         close: bool,
         func: CSourceIoFn,
         data: *mut c_void,
-    ),
-    update_io: extern "C" fn(object: *mut c_void, source: *mut CSource, mask: u32),
-    add_idle:
-        extern "C" fn(object: *mut c_void, enabled: bool, func: CSourceIdleFn, data: *mut c_void),
-    enable_idle: extern "C" fn(object: *mut c_void, source: *mut CSource, enabled: bool),
-    add_event: extern "C" fn(object: *mut c_void, func: CSourceEventFn, data: *mut c_void),
-    signal_event: extern "C" fn(object: *mut c_void, source: *mut CSource),
-    add_timer: extern "C" fn(object: *mut c_void, func: CSourceTimerFn, data: *mut c_void),
+    ) -> *mut CSource,
+    update_io: extern "C" fn(object: *mut c_void, source: *mut CSource, mask: u32) -> c_int,
+    add_idle: extern "C" fn(
+        object: *mut c_void,
+        enabled: bool,
+        func: CSourceIdleFn,
+        data: *mut c_void,
+    ) -> *mut CSource,
+    enable_idle: extern "C" fn(object: *mut c_void, source: *mut CSource, enabled: bool) -> c_int,
+    add_event:
+        extern "C" fn(object: *mut c_void, func: CSourceEventFn, data: *mut c_void) -> *mut CSource,
+    signal_event: extern "C" fn(object: *mut c_void, source: *mut CSource) -> c_int,
+    add_timer:
+        extern "C" fn(object: *mut c_void, func: CSourceTimerFn, data: *mut c_void) -> *mut CSource,
     update_timer: extern "C" fn(
         object: *mut c_void,
         source: *mut CSource,
         value: &libc::timespec,
         interval: &libc::timespec,
         absolute: bool,
-    ),
+    ) -> c_int,
     add_signal: extern "C" fn(
         object: *mut c_void,
         signal_number: c_int,
         func: CSourceSignalFn,
         data: *mut c_void,
-    ),
+    ) -> *mut CSource,
     destroy_source: extern "C" fn(object: *mut c_void, source: *mut CSource),
 }
 
@@ -568,11 +574,17 @@ struct CLoopUtils {
     iface: CInterface,
 }
 
-struct CLoopUtilsImpl {}
+struct CLoopUtilsImpl {
+    iface: *mut CLoopUtils,
+    sources: HashMap<RawFd, LoopUtilsSourceCb>,
+}
 
 pub fn loop_utils_new_impl(interface: *mut CInterface) -> LoopUtilsImpl {
     LoopUtilsImpl {
-        inner: Box::pin(interface as *mut CLoopUtilsImpl),
+        inner: Box::pin(CLoopUtilsImpl {
+            iface: interface as *mut CLoopUtils,
+            sources: HashMap::new(),
+        }),
 
         add_io: CLoopUtilsImpl::add_io,
         update_io: CLoopUtilsImpl::update_io,
@@ -588,15 +600,18 @@ pub fn loop_utils_new_impl(interface: *mut CInterface) -> LoopUtilsImpl {
 }
 
 impl CLoopUtilsImpl {
-    fn from_loop_utils(this: &LoopUtilsImpl) -> &CLoopUtils {
-        unsafe {
+    fn from_loop_utils(this: &LoopUtilsImpl) -> (&mut CLoopUtilsImpl, &mut CLoopUtils) {
+        let c_looputils_impl = unsafe {
             this.inner
                 .as_ref()
-                .downcast_ref::<*const CLoopUtils>()
+                .downcast_ref::<*mut CLoopUtilsImpl>()
                 .unwrap()
-                .as_ref()
+                .as_mut()
                 .unwrap()
-        }
+        };
+        let c_looputils = unsafe { c_looputils_impl.iface.as_mut().unwrap() };
+
+        (c_looputils_impl, c_looputils)
     }
 
     #[no_mangle]
@@ -606,27 +621,45 @@ impl CLoopUtilsImpl {
         (func)(fd, mask)
     }
 
-    fn add_io(this: &LoopUtilsImpl, fd: RawFd, mask: u32, close: bool, func: Box<SourceIoFn>) {
+    fn add_io(
+        this: &LoopUtilsImpl,
+        fd: RawFd,
+        mask: u32,
+        close: bool,
+        func: Box<SourceIoFn>,
+    ) -> Option<LoopSource> {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let mut source_io_func = Box::pin(func);
+            let (utils_impl, utils) = Self::from_loop_utils(this);
+            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+            let func_raw = Box::into_raw(func);
 
-            ((*funcs).add_io)(
-                utils_impl.iface.cb.data,
+            utils_impl
+                .sources
+                .insert(fd, LoopUtilsSourceCb::Io(Box::new(func_raw)));
+
+            let csource = ((*funcs).add_io)(
+                utils.iface.cb.data,
                 fd,
                 mask,
                 close,
                 Self::source_io_trampoline,
-                Pin::into_inner(source_io_func.as_mut()) as *mut SourceIoFn as *mut c_void,
-            )
+                func_raw as *mut c_void,
+            );
+
+            if csource.is_null() {
+                return None;
+            }
+            let csource = (*csource).clone();
+
+            Some(LoopSource::new(LoopSourceType::Io, csource))
         }
     }
 
-    fn update_io(this: &LoopUtilsImpl, source: &mut CSource, mask: u32) {
+    fn update_io(this: &LoopUtilsImpl, source: &mut LoopSource, mask: u32) -> i32 {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
+            let utils_impl = Self::from_loop_utils(this).1;
             let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+            let source = source.source();
 
             ((*funcs).update_io)(utils_impl.iface.cb.data, source, mask)
         }
@@ -639,25 +672,41 @@ impl CLoopUtilsImpl {
         (func)()
     }
 
-    fn add_idle(this: &LoopUtilsImpl, enabled: bool, func: Box<SourceIdleFn>) {
+    fn add_idle(
+        this: &LoopUtilsImpl,
+        enabled: bool,
+        func: Box<SourceIdleFn>,
+    ) -> Option<LoopSource> {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let mut source_idle_func = Box::pin(func);
+            let (utils_impl, utils) = Self::from_loop_utils(this);
+            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+            let func_raw = Box::into_raw(func);
 
-            ((*funcs).add_idle)(
-                utils_impl.iface.cb.data,
+            let csource = ((*funcs).add_idle)(
+                utils.iface.cb.data,
                 enabled,
                 Self::source_idle_trampoline,
-                Pin::into_inner(source_idle_func.as_mut()) as *mut SourceIdleFn as *mut c_void,
-            )
+                func_raw as *mut c_void,
+            );
+
+            if csource.is_null() {
+                return None;
+            }
+            let csource = (*csource).clone();
+
+            utils_impl
+                .sources
+                .insert(csource.fd, LoopUtilsSourceCb::Idle(Box::new(func_raw)));
+
+            Some(LoopSource::new(LoopSourceType::Idle, csource))
         }
     }
 
-    fn enable_idle(this: &LoopUtilsImpl, source: &mut CSource, enabled: bool) {
+    fn enable_idle(this: &LoopUtilsImpl, source: &mut LoopSource, enabled: bool) -> i32 {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
+            let utils_impl = Self::from_loop_utils(this).1;
             let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+            let source = source.source();
 
             ((*funcs).enable_idle)(utils_impl.iface.cb.data, source, enabled)
         }
@@ -670,24 +719,36 @@ impl CLoopUtilsImpl {
         (func)(count)
     }
 
-    fn add_event(this: &LoopUtilsImpl, func: Box<SourceEventFn>) {
+    fn add_event(this: &LoopUtilsImpl, func: Box<SourceEventFn>) -> Option<LoopSource> {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let mut source_event_func = Box::pin(func);
+            let (utils_impl, utils) = Self::from_loop_utils(this);
+            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+            let func_raw = Box::into_raw(func);
 
-            ((*funcs).add_event)(
-                utils_impl.iface.cb.data,
+            let csource = ((*funcs).add_event)(
+                utils.iface.cb.data,
                 Self::source_event_trampoline,
-                Pin::into_inner(source_event_func.as_mut()) as *mut SourceEventFn as *mut c_void,
-            )
+                func_raw as *mut c_void,
+            );
+
+            if csource.is_null() {
+                return None;
+            }
+            let csource = (*csource).clone();
+
+            utils_impl
+                .sources
+                .insert(csource.fd, LoopUtilsSourceCb::Event(Box::new(func_raw)));
+
+            Some(LoopSource::new(LoopSourceType::Event, csource))
         }
     }
 
-    fn signal_event(this: &LoopUtilsImpl, source: &mut CSource) {
+    fn signal_event(this: &LoopUtilsImpl, source: &mut LoopSource) -> i32 {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
+            let utils_impl = Self::from_loop_utils(this).1;
             let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+            let source = source.source();
 
             ((*funcs).signal_event)(utils_impl.iface.cb.data, source)
         }
@@ -700,30 +761,42 @@ impl CLoopUtilsImpl {
         (func)(expirations)
     }
 
-    fn add_timer(this: &LoopUtilsImpl, func: Box<SourceTimerFn>) {
+    fn add_timer(this: &LoopUtilsImpl, func: Box<SourceTimerFn>) -> Option<LoopSource> {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let mut source_timer_func = Box::pin(func);
+            let (utils_impl, utils) = Self::from_loop_utils(this);
+            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+            let func_raw = Box::into_raw(func);
 
-            ((*funcs).add_timer)(
-                utils_impl.iface.cb.data,
+            let csource = ((*funcs).add_timer)(
+                utils.iface.cb.data,
                 Self::source_timer_trampoline,
-                Pin::into_inner(source_timer_func.as_mut()) as *mut SourceTimerFn as *mut c_void,
-            )
+                func_raw as *mut c_void,
+            );
+
+            if csource.is_null() {
+                return None;
+            }
+            let csource = (*csource).clone();
+
+            utils_impl
+                .sources
+                .insert(csource.fd, LoopUtilsSourceCb::Timer(Box::new(func_raw)));
+
+            Some(LoopSource::new(LoopSourceType::Timer, csource))
         }
     }
 
     fn update_timer(
         this: &LoopUtilsImpl,
-        source: &mut CSource,
+        source: &mut LoopSource,
         value: &libc::timespec,
         interval: &libc::timespec,
         absolute: bool,
-    ) {
+    ) -> i32 {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
+            let utils_impl = Self::from_loop_utils(this).1;
             let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+            let source = source.source();
 
             ((*funcs).update_timer)(utils_impl.iface.cb.data, source, value, interval, absolute)
         }
@@ -736,167 +809,244 @@ impl CLoopUtilsImpl {
         (func)(signal_number)
     }
 
-    fn add_signal(this: &LoopUtilsImpl, signal_number: i32, func: Box<SourceSignalFn>) {
+    fn add_signal(
+        this: &LoopUtilsImpl,
+        signal_number: i32,
+        func: Box<SourceSignalFn>,
+    ) -> Option<LoopSource> {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
-            let mut source_signal_func = Box::pin(func);
+            let (utils_impl, utils) = Self::from_loop_utils(this);
+            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+            let func_raw = Box::into_raw(func);
 
-            ((*funcs).add_signal)(
-                utils_impl.iface.cb.data,
+            let csource = ((*funcs).add_signal)(
+                utils.iface.cb.data,
                 signal_number,
                 Self::source_signal_trampoline,
-                Pin::into_inner(source_signal_func.as_mut()) as *mut SourceSignalFn as *mut c_void,
-            )
+                func_raw as *mut c_void,
+            );
+
+            if csource.is_null() {
+                return None;
+            }
+            let csource = (*csource).clone();
+
+            utils_impl
+                .sources
+                .insert(csource.fd, LoopUtilsSourceCb::Signal(Box::new(func_raw)));
+
+            Some(LoopSource::new(LoopSourceType::Signal, csource))
         }
     }
 
-    fn destroy_source(this: &LoopUtilsImpl, source: &mut CSource) {
+    fn destroy_source(this: &LoopUtilsImpl, mut source: LoopSource) {
         unsafe {
-            let utils_impl = Self::from_loop_utils(this);
-            let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+            let (utils_impl, utils) = Self::from_loop_utils(this);
+            let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+            let src = source.source();
 
-            ((*funcs).destroy_source)(utils_impl.iface.cb.data, source)
+            if let Some(r) = utils_impl.sources.remove(&src.fd) {
+                match r {
+                    LoopUtilsSourceCb::Io(io_cb) => {
+                        let cb = io_cb
+                            .as_ref()
+                            .downcast_ref::<*mut SourceIoFn>()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap();
+                        let _ = Box::<SourceIoFn>::from_raw(cb as *mut _);
+                    }
+                    LoopUtilsSourceCb::Idle(idle_cb) => {
+                        let cb = idle_cb
+                            .as_ref()
+                            .downcast_ref::<*mut SourceIdleFn>()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap();
+                        let _ = Box::<SourceIdleFn>::from_raw(cb as *mut _);
+                    }
+                    LoopUtilsSourceCb::Event(event_cb) => {
+                        let cb = event_cb
+                            .as_ref()
+                            .downcast_ref::<*mut SourceEventFn>()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap();
+                        let _ = Box::<SourceEventFn>::from_raw(cb as *mut _);
+                    }
+                    LoopUtilsSourceCb::Timer(timer_cb) => {
+                        let cb = timer_cb
+                            .as_ref()
+                            .downcast_ref::<*mut SourceTimerFn>()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap();
+                        let _ = Box::<SourceTimerFn>::from_raw(cb as *mut _);
+                    }
+                    LoopUtilsSourceCb::Signal(signal_cb) => {
+                        let cb = signal_cb
+                            .as_ref()
+                            .downcast_ref::<*mut SourceSignalFn>()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap();
+                        let _ = Box::<SourceSignalFn>::from_raw(cb as *mut _);
+                    }
+                }
+            }
+
+            ((*funcs).destroy_source)(utils.iface.cb.data, src);
+
+            let _ = src;
         }
     }
 }
 
-struct LoopUtilsIface {}
-
-impl LoopUtilsIface {
-    fn c_to_loop_utils_impl(object: *mut c_void) -> &'static mut LoopUtilsImpl {
-        unsafe { (object as *mut LoopUtilsImpl).as_mut().unwrap() }
-    }
-
-    extern "C" fn add_io(
-        object: *mut c_void,
-        fd: c_int,
-        mask: u32,
-        close: bool,
-        func: CSourceIoFn,
-        data: *mut c_void,
-    ) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-
-        loop_utils_impl.add_io(
-            fd,
-            mask,
-            close,
-            Box::new(move |fd, mask| func(data, fd, mask)),
-        );
-    }
-
-    extern "C" fn update_io(object: *mut c_void, source: *mut CSource, mask: u32) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-        let c_source = unsafe { source.as_mut().unwrap() };
-
-        loop_utils_impl.update_io(c_source, mask)
-    }
-
-    extern "C" fn add_idle(
-        object: *mut c_void,
-        enabled: bool,
-        func: CSourceIdleFn,
-        data: *mut c_void,
-    ) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-
-        loop_utils_impl.add_idle(enabled, Box::new(move || func(data)));
-    }
-
-    extern "C" fn enable_idle(object: *mut c_void, source: *mut CSource, enabled: bool) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-        let c_source = unsafe { source.as_mut().unwrap() };
-
-        loop_utils_impl.enable_idle(c_source, enabled)
-    }
-
-    extern "C" fn add_event(object: *mut c_void, func: CSourceEventFn, data: *mut c_void) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-
-        loop_utils_impl.add_event(Box::new(move |count| func(data, count)))
-    }
-
-    extern "C" fn signal_event(object: *mut c_void, source: *mut CSource) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-        let c_source = unsafe { source.as_mut().unwrap() };
-
-        loop_utils_impl.signal_event(c_source)
-    }
-
-    extern "C" fn add_timer(object: *mut c_void, func: CSourceTimerFn, data: *mut c_void) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-
-        loop_utils_impl.add_timer(Box::new(move |expirations| func(data, expirations)))
-    }
-
-    extern "C" fn update_timer(
-        object: *mut c_void,
-        source: *mut CSource,
-        value: &libc::timespec,
-        interval: &libc::timespec,
-        absolute: bool,
-    ) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-        let c_source = unsafe { source.as_mut().unwrap() };
-
-        loop_utils_impl.update_timer(c_source, value, interval, absolute)
-    }
-
-    extern "C" fn add_signal(
-        object: *mut c_void,
-        signal_number: c_int,
-        func: CSourceSignalFn,
-        data: *mut c_void,
-    ) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-
-        loop_utils_impl.add_signal(
-            signal_number,
-            Box::new(move |signal_number| func(data, signal_number)),
-        )
-    }
-
-    extern "C" fn destroy_source(object: *mut c_void, source: *mut CSource) {
-        let loop_utils_impl = Self::c_to_loop_utils_impl(object);
-        let c_source = unsafe { source.as_mut().unwrap() };
-
-        loop_utils_impl.destroy_source(c_source)
-    }
-}
-
-static LOOP_UTILS_METHODS: CLoopUtilsMethods = CLoopUtilsMethods {
-    version: 0,
-
-    add_io: LoopUtilsIface::add_io,
-    update_io: LoopUtilsIface::update_io,
-    add_idle: LoopUtilsIface::add_idle,
-    enable_idle: LoopUtilsIface::enable_idle,
-    add_event: LoopUtilsIface::add_event,
-    signal_event: LoopUtilsIface::signal_event,
-    add_timer: LoopUtilsIface::add_timer,
-    update_timer: LoopUtilsIface::update_timer,
-    add_signal: LoopUtilsIface::add_signal,
-    destroy_source: LoopUtilsIface::destroy_source,
-};
-
-pub unsafe fn loop_utils_make_native(cpu: &LoopUtilsImpl) -> *mut CInterface {
-    let c_loop_utils: *mut CLoopUtils = unsafe {
-        libc::calloc(1, std::mem::size_of::<CLoopUtils>() as libc::size_t) as *mut CLoopUtils
-    };
-    let c_loop_utils = unsafe { &mut *c_loop_utils };
-
-    c_loop_utils.iface.version = 0;
-    c_loop_utils.iface.type_ = c_string(interface::CPU).into_raw();
-    c_loop_utils.iface.cb.funcs = &LOOP_UTILS_METHODS as *const CLoopUtilsMethods as *mut c_void;
-    c_loop_utils.iface.cb.data = cpu as *const LoopUtilsImpl as *mut c_void;
-
-    c_loop_utils as *mut CLoopUtils as *mut CInterface
-}
-
-pub unsafe fn loop_utils_free_native(c_loop_util: *mut CInterface) {
-    unsafe {
-        let _ = CString::from_raw((*c_loop_util).type_ as *mut i8);
-        libc::free(c_loop_util as *mut c_void);
-    }
-}
+// struct LoopUtilsIface {}
+//
+// impl LoopUtilsIface {
+//     fn c_to_loop_utils_impl(object: *mut c_void) -> &'static mut LoopUtilsImpl {
+//         unsafe { (object as *mut LoopUtilsImpl).as_mut().unwrap() }
+//     }
+//
+//     extern "C" fn add_io(
+//         object: *mut c_void,
+//         fd: c_int,
+//         mask: u32,
+//         close: bool,
+//         func: CSourceIoFn,
+//         data: *mut c_void,
+//     ) -> *mut CSource {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//
+//         let Some(LoopSource {
+//             stype: _,
+//             source: mut csource,
+//         }) = loop_utils_impl.add_io(
+//             fd,
+//             mask,
+//             close,
+//             Box::new(move |fd, mask| func(data, fd, mask)),
+//         )
+//         else {
+//             return std::ptr::null_mut();
+//         };
+//
+//         return &mut csource as *mut CSource;
+//     }
+//
+//     extern "C" fn update_io(object: *mut c_void, source: *mut CSource, mask: u32) -> i32 {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//         let c_source = unsafe { source.as_mut().unwrap() as CSource };
+//         let mut lsrc = LoopSource::new(LoopSourceType::Io, c_source);
+//
+//         loop_utils_impl.update_io(&lsrc, mask)
+//     }
+//
+//     extern "C" fn add_idle(
+//         object: *mut c_void,
+//         enabled: bool,
+//         func: CSourceIdleFn,
+//         data: *mut c_void,
+//     ) -> *const CSource {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//
+//         loop_utils_impl.add_idle(enabled, Box::new(move || func(data)));
+//     }
+//
+//     extern "C" fn enable_idle(object: *mut c_void, source: *mut CSource, enabled: bool) {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//         let c_source = unsafe { source.as_mut().unwrap() };
+//
+//         loop_utils_impl.enable_idle(c_source, enabled)
+//     }
+//
+//     extern "C" fn add_event(object: *mut c_void, func: CSourceEventFn, data: *mut c_void) {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//
+//         loop_utils_impl.add_event(Box::new(move |count| func(data, count)))
+//     }
+//
+//     extern "C" fn signal_event(object: *mut c_void, source: *mut CSource) {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//         let c_source = unsafe { source.as_mut().unwrap() };
+//
+//         loop_utils_impl.signal_event(c_source)
+//     }
+//
+//     extern "C" fn add_timer(object: *mut c_void, func: CSourceTimerFn, data: *mut c_void) {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//
+//         loop_utils_impl.add_timer(Box::new(move |expirations| func(data, expirations)))
+//     }
+//
+//     extern "C" fn update_timer(
+//         object: *mut c_void,
+//         source: *mut CSource,
+//         value: &libc::timespec,
+//         interval: &libc::timespec,
+//         absolute: bool,
+//     ) {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//         let c_source = unsafe { source.as_mut().unwrap() };
+//
+//         loop_utils_impl.update_timer(c_source, value, interval, absolute)
+//     }
+//
+//     extern "C" fn add_signal(
+//         object: *mut c_void,
+//         signal_number: c_int,
+//         func: CSourceSignalFn,
+//         data: *mut c_void,
+//     ) {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//
+//         loop_utils_impl.add_signal(
+//             signal_number,
+//             Box::new(move |signal_number| func(data, signal_number)),
+//         )
+//     }
+//
+//     extern "C" fn destroy_source(object: *mut c_void, source: *mut CSource) {
+//         let loop_utils_impl = Self::c_to_loop_utils_impl(object);
+//         let c_source = unsafe { source.as_mut().unwrap() };
+//
+//         loop_utils_impl.destroy_source(c_source)
+//     }
+// }
+//
+// static LOOP_UTILS_METHODS: CLoopUtilsMethods = CLoopUtilsMethods {
+//     version: 0,
+//
+//     add_io: LoopUtilsIface::add_io,
+//     update_io: LoopUtilsIface::update_io,
+//     add_idle: LoopUtilsIface::add_idle,
+//     enable_idle: LoopUtilsIface::enable_idle,
+//     add_event: LoopUtilsIface::add_event,
+//     signal_event: LoopUtilsIface::signal_event,
+//     add_timer: LoopUtilsIface::add_timer,
+//     update_timer: LoopUtilsIface::update_timer,
+//     add_signal: LoopUtilsIface::add_signal,
+//     destroy_source: LoopUtilsIface::destroy_source,
+// };
+//
+// pub unsafe fn loop_utils_make_native(cpu: &LoopUtilsImpl) -> *mut CInterface {
+//     let c_loop_utils: *mut CLoopUtils = unsafe {
+//         libc::calloc(1, std::mem::size_of::<CLoopUtils>() as libc::size_t) as *mut CLoopUtils
+//     };
+//     let c_loop_utils = unsafe { &mut *c_loop_utils };
+//
+//     c_loop_utils.iface.version = 0;
+//     c_loop_utils.iface.type_ = c_string(interface::CPU).into_raw();
+//     c_loop_utils.iface.cb.funcs = &LOOP_UTILS_METHODS as *const CLoopUtilsMethods as *mut c_void;
+//     c_loop_utils.iface.cb.data = cpu as *const LoopUtilsImpl as *mut c_void;
+//
+//     c_loop_utils as *mut CLoopUtils as *mut CInterface
+// }
+//
+// pub unsafe fn loop_utils_free_native(c_loop_util: *mut CInterface) {
+//     unsafe {
+//         let _ = CString::from_raw((*c_loop_util).type_ as *mut i8);
+//         libc::free(c_loop_util as *mut c_void);
+//     }
+// }
