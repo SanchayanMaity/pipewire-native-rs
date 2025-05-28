@@ -170,7 +170,7 @@ impl ControlMethodsIface {
     }
 }
 
-pub unsafe fn make_native(loop_ctrl: &ControlMethodsImpl) -> *mut CInterface {
+pub(crate) unsafe fn make_native(loop_ctrl: &ControlMethodsImpl) -> *mut CInterface {
     let c_ctrl_methods: *mut CControlMethods = unsafe {
         libc::calloc(1, std::mem::size_of::<CControlMethods>() as libc::size_t)
             as *mut CControlMethods
@@ -186,7 +186,7 @@ pub unsafe fn make_native(loop_ctrl: &ControlMethodsImpl) -> *mut CInterface {
     c_ctrl_methods as *mut CControlMethods as *mut CInterface
 }
 
-pub unsafe fn free_native(c_loop_ctrl: *mut CInterface) {
+pub(crate) unsafe fn free_native(c_loop_ctrl: *mut CInterface) {
     unsafe {
         let _ = CString::from_raw((*c_loop_ctrl).type_ as *mut i8);
         libc::free(c_loop_ctrl as *mut c_void);

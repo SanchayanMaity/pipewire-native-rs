@@ -586,7 +586,7 @@ static LOOP_UTILS_METHODS: CLoopUtilsMethods = CLoopUtilsMethods {
     destroy_source: LoopUtilsCIface::destroy_source,
 };
 
-pub unsafe fn make_native(loop_utils: &LoopUtilsImpl) -> *mut CInterface {
+pub(crate) unsafe fn make_native(loop_utils: &LoopUtilsImpl) -> *mut CInterface {
     let c_loop_utils: *mut CLoopUtils = unsafe {
         libc::calloc(1, std::mem::size_of::<CLoopUtils>() as libc::size_t) as *mut CLoopUtils
     };
@@ -607,7 +607,7 @@ pub unsafe fn make_native(loop_utils: &LoopUtilsImpl) -> *mut CInterface {
     c_loop_utils as *mut CLoopUtils as *mut CInterface
 }
 
-pub unsafe fn free_native(c_loop_util: *mut CInterface) {
+pub(crate) unsafe fn free_native(c_loop_util: *mut CInterface) {
     unsafe {
         let _ = CString::from_raw((*c_loop_util).type_ as *mut i8);
         libc::free(c_loop_util as *mut c_void);
