@@ -468,41 +468,41 @@ pub(crate) unsafe fn free_native(c_system: *mut CInterface) {
 static SYSTEM_METHODS: CSystemMethods = CSystemMethods {
     version: 0,
 
-    read: SystemImplIface::read,
-    write: SystemImplIface::write,
+    read: SystemImplCIface::read,
+    write: SystemImplCIface::write,
     /* NOTE: we can't handle varargs, so we just directly call ioctl() */
     ioctl: impl_ioctl,
-    close: SystemImplIface::close,
+    close: SystemImplCIface::close,
 
-    clock_gettime: SystemImplIface::clock_gettime,
-    clock_getres: SystemImplIface::clock_getres,
+    clock_gettime: SystemImplCIface::clock_gettime,
+    clock_getres: SystemImplCIface::clock_getres,
 
-    pollfd_create: SystemImplIface::pollfd_create,
-    pollfd_add: SystemImplIface::pollfd_add,
-    pollfd_mod: SystemImplIface::pollfd_mod,
-    pollfd_del: SystemImplIface::pollfd_del,
-    pollfd_wait: SystemImplIface::pollfd_wait,
+    pollfd_create: SystemImplCIface::pollfd_create,
+    pollfd_add: SystemImplCIface::pollfd_add,
+    pollfd_mod: SystemImplCIface::pollfd_mod,
+    pollfd_del: SystemImplCIface::pollfd_del,
+    pollfd_wait: SystemImplCIface::pollfd_wait,
 
-    timerfd_create: SystemImplIface::timerfd_create,
-    timerfd_settime: SystemImplIface::timerfd_settime,
-    timerfd_gettime: SystemImplIface::timerfd_gettime,
-    timerfd_read: SystemImplIface::timerfd_read,
+    timerfd_create: SystemImplCIface::timerfd_create,
+    timerfd_settime: SystemImplCIface::timerfd_settime,
+    timerfd_gettime: SystemImplCIface::timerfd_gettime,
+    timerfd_read: SystemImplCIface::timerfd_read,
 
-    eventfd_create: SystemImplIface::eventfd_create,
-    eventfd_read: SystemImplIface::eventfd_read,
-    eventfd_write: SystemImplIface::eventfd_write,
+    eventfd_create: SystemImplCIface::eventfd_create,
+    eventfd_read: SystemImplCIface::eventfd_read,
+    eventfd_write: SystemImplCIface::eventfd_write,
 
-    signalfd_create: SystemImplIface::signalfd_create,
-    signalfd_read: SystemImplIface::signalfd_read,
+    signalfd_create: SystemImplCIface::signalfd_create,
+    signalfd_read: SystemImplCIface::signalfd_read,
 };
 
-struct SystemImplIface {}
+struct SystemImplCIface {}
 
 extern "C" {
     fn impl_ioctl(object: *mut c_void, fd: c_int, request: c_ulong, ...) -> c_int;
 }
 
-impl SystemImplIface {
+impl SystemImplCIface {
     fn c_to_system_impl(object: *mut c_void) -> &'static SystemImpl {
         unsafe { &*(object as *mut SystemImpl) }
     }

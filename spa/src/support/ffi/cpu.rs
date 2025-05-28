@@ -131,9 +131,9 @@ impl CCpuImpl {
     }
 }
 
-struct CpuImplIface {}
+struct CpuImplCIface {}
 
-impl CpuImplIface {
+impl CpuImplCIface {
     fn c_to_cpu_impl(object: *mut c_void) -> &'static mut CpuImpl {
         unsafe { (object as *mut CpuImpl).as_mut().unwrap() }
     }
@@ -179,12 +179,12 @@ impl CpuImplIface {
 static CPU_METHODS: CCpuMethods = CCpuMethods {
     version: 0,
 
-    get_flags: CpuImplIface::get_flags,
-    force_flags: CpuImplIface::force_flags,
-    get_count: CpuImplIface::get_count,
-    get_max_align: CpuImplIface::get_max_align,
-    get_vm_type: CpuImplIface::get_vm_type,
-    zero_denormals: CpuImplIface::zero_denormals,
+    get_flags: CpuImplCIface::get_flags,
+    force_flags: CpuImplCIface::force_flags,
+    get_count: CpuImplCIface::get_count,
+    get_max_align: CpuImplCIface::get_max_align,
+    get_vm_type: CpuImplCIface::get_vm_type,
+    zero_denormals: CpuImplCIface::zero_denormals,
 };
 
 pub(crate) unsafe fn make_native(cpu: &CpuImpl) -> *mut CInterface {

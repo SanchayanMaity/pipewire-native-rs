@@ -884,14 +884,14 @@ impl CLoopUtilsImpl {
     }
 }
 
-struct LoopUtilsIface {
+struct LoopUtilsCIface {
     loop_utils: *const LoopUtilsImpl,
     sources: HashMap<*mut CSource, Pin<Box<LoopUtilsSource>>>,
 }
 
-impl LoopUtilsIface {
-    fn c_to_loop_utils_impl(object: *mut c_void) -> &'static mut Pin<Box<LoopUtilsIface>> {
-        unsafe { (object as *mut Pin<Box<LoopUtilsIface>>).as_mut().unwrap() }
+impl LoopUtilsCIface {
+    fn c_to_loop_utils_impl(object: *mut c_void) -> &'static mut Pin<Box<LoopUtilsCIface>> {
+        unsafe { (object as *mut Pin<Box<LoopUtilsCIface>>).as_mut().unwrap() }
     }
 
     extern "C" fn add_io(
@@ -1084,16 +1084,16 @@ impl LoopUtilsIface {
 static LOOP_UTILS_METHODS: CLoopUtilsMethods = CLoopUtilsMethods {
     version: 0,
 
-    add_io: LoopUtilsIface::add_io,
-    update_io: LoopUtilsIface::update_io,
-    add_idle: LoopUtilsIface::add_idle,
-    enable_idle: LoopUtilsIface::enable_idle,
-    add_event: LoopUtilsIface::add_event,
-    signal_event: LoopUtilsIface::signal_event,
-    add_timer: LoopUtilsIface::add_timer,
-    update_timer: LoopUtilsIface::update_timer,
-    add_signal: LoopUtilsIface::add_signal,
-    destroy_source: LoopUtilsIface::destroy_source,
+    add_io: LoopUtilsCIface::add_io,
+    update_io: LoopUtilsCIface::update_io,
+    add_idle: LoopUtilsCIface::add_idle,
+    enable_idle: LoopUtilsCIface::enable_idle,
+    add_event: LoopUtilsCIface::add_event,
+    signal_event: LoopUtilsCIface::signal_event,
+    add_timer: LoopUtilsCIface::add_timer,
+    update_timer: LoopUtilsCIface::update_timer,
+    add_signal: LoopUtilsCIface::add_signal,
+    destroy_source: LoopUtilsCIface::destroy_source,
 };
 
 pub unsafe fn loop_utils_make_native(loop_utils: &LoopUtilsImpl) -> *mut CInterface {
@@ -1101,7 +1101,7 @@ pub unsafe fn loop_utils_make_native(loop_utils: &LoopUtilsImpl) -> *mut CInterf
         libc::calloc(1, std::mem::size_of::<CLoopUtils>() as libc::size_t) as *mut CLoopUtils
     };
 
-    let loop_utils_iface = Box::pin(LoopUtilsIface {
+    let loop_utils_iface = Box::pin(LoopUtilsCIface {
         loop_utils: loop_utils as *const LoopUtilsImpl,
         sources: HashMap::new(),
     });
@@ -1112,7 +1112,7 @@ pub unsafe fn loop_utils_make_native(loop_utils: &LoopUtilsImpl) -> *mut CInterf
     c_loop_utils.iface.type_ = c_string(interface::CPU).into_raw();
     c_loop_utils.iface.cb.funcs = &LOOP_UTILS_METHODS as *const CLoopUtilsMethods as *mut c_void;
     c_loop_utils.iface.cb.data =
-        &loop_utils_iface as *const Pin<Box<LoopUtilsIface>> as *mut c_void;
+        &loop_utils_iface as *const Pin<Box<LoopUtilsCIface>> as *mut c_void;
 
     c_loop_utils as *mut CLoopUtils as *mut CInterface
 }
