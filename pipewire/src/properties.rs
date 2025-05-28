@@ -10,6 +10,8 @@ use tinyjson::{JsonParseError, JsonValue};
 
 #[derive(Clone, Debug)]
 pub struct Properties {
+    // TODO: Make a Vec<spa::dict::ITem> here, so we can easily construct a Dict view of properties
+    // at runtime, a-la pw_properties vs. spa_dict
     map: HashMap<String, String>,
 }
 
