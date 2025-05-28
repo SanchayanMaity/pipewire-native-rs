@@ -36,6 +36,7 @@ fn test_load_support() {
             Some(Dict::new(vec![
                 ("log.timestamp".to_string(), "local".to_string()),
                 ("log.level".to_string(), "7".to_string()),
+                ("log.line".to_string(), true.to_string()),
             ])),
             &support,
         )
