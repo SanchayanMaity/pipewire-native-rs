@@ -125,7 +125,7 @@ impl CSystemImpl {
         unsafe {
             this.inner
                 .as_ref()
-                .downcast_ref::<*const CSystem>()
+                .downcast_ref::<*mut CSystem>()
                 .unwrap()
                 .as_ref()
                 .unwrap()
