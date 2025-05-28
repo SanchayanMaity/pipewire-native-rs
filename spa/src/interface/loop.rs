@@ -133,6 +133,7 @@ pub struct LoopUtilsSource {
     pub inner: *mut CSource,
 }
 
+#[allow(clippy::type_complexity)]
 pub struct LoopUtilsImpl {
     pub inner: Pin<Box<dyn Any>>,
 
