@@ -106,11 +106,11 @@ impl ControlMethodsImpl {
 
 impl Interface for ControlMethodsImpl {
     unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
-        crate::support::ffi::r#loop::control_methods_make_native(self)
+        crate::support::ffi::r#loop::control::make_native(self)
     }
 
     unsafe fn free_native(loop_: *mut super::ffi::CInterface) {
-        crate::support::ffi::r#loop::control_methods_free_native(loop_)
+        crate::support::ffi::r#loop::control::free_native(loop_)
     }
 }
 
@@ -251,10 +251,10 @@ impl LoopUtilsImpl {
 
 impl Interface for LoopUtilsImpl {
     unsafe fn make_native(&self) -> *mut super::ffi::CInterface {
-        crate::support::ffi::r#loop::loop_utils_make_native(self)
+        crate::support::ffi::r#loop::utils::make_native(self)
     }
 
     unsafe fn free_native(loop_: *mut super::ffi::CInterface) {
-        crate::support::ffi::r#loop::loop_utils_free_native(loop_)
+        crate::support::ffi::r#loop::utils::free_native(loop_)
     }
 }
