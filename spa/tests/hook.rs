@@ -26,11 +26,14 @@ fn test_hooks() {
     let accum2 = accum.clone();
 
     let events = TestEvents {
+        // Increment accumulator by callback value
         constie: Box::new(move |i| *accum1.lock().unwrap() += i),
+        // Increment accumulator by struct value * callback value
         normie: Box::new(move |this, i, s| {
             *accum2.lock().unwrap() += this.value * i;
             assert_eq!(s, &this.name);
         }),
+        // Set struct value to callback value
         mutie: Box::new(move |this, i, s| {
             this.value = i;
             this.name = s.to_string();
