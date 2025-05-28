@@ -12,10 +12,10 @@ use crate::interface::ffi::{CInterface, CSupport};
 use crate::interface::plugin::{Handle, HandleFactory, Interface, InterfaceInfo};
 use crate::interface::{self, Support};
 
-use super::c_string;
 use super::cpu;
 use super::log;
 use super::system;
+use super::{c_string, r#loop};
 
 const ENTRYPOINT: &str = "spa_handle_factory_enum";
 type EntryPointFn = unsafe extern "C" fn(*const *mut CHandleFactory, *mut u32) -> c_int;
@@ -198,6 +198,7 @@ impl Handle for CHandleImpl {
         match type_ {
             interface::CPU => Some(Box::new(cpu::new_impl(iface))),
             interface::LOG => Some(Box::new(log::new_impl(iface))),
+            interface::LOOP => Some(Box::new(r#loop::new_impl(iface))),
             interface::SYSTEM => Some(Box::new(system::new_impl(iface))),
             _ => None,
         }
