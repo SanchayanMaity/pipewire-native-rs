@@ -10,7 +10,7 @@ use tinyjson::{JsonParseError, JsonValue};
 
 #[derive(Clone, Debug)]
 pub struct Properties {
-    dict: HashMap<String, String>,
+    map: HashMap<String, String>,
 }
 
 impl Default for Properties {
@@ -26,7 +26,7 @@ pub fn parse_bool(value: &String) -> bool {
 impl Properties {
     pub fn new() -> Self {
         Self {
-            dict: HashMap::new(),
+            map: HashMap::new(),
         }
     }
 
@@ -37,7 +37,7 @@ impl Properties {
             map.insert(k.to_string(), v.to_string());
         }
 
-        Self { dict: map }
+        Self { map }
     }
 
     pub fn new_string(args: &str) -> Result<Self, String> {
@@ -50,12 +50,12 @@ impl Properties {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
-        self.dict.iter()
+        self.map.iter()
     }
 
     pub fn dict(&self) -> Dict {
         Dict::new(
-            self.dict
+            self.map
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect::<Vec<(String, String)>>(),
@@ -63,15 +63,15 @@ impl Properties {
     }
 
     pub fn set(&mut self, key: &str, value: String) {
-        self.dict.insert(key.to_string(), value);
+        self.map.insert(key.to_string(), value);
     }
 
     pub fn unset(&mut self, key: &str) -> Option<String> {
-        self.dict.remove(key)
+        self.map.remove(key)
     }
 
     pub fn get(&self, key: &str) -> Option<&String> {
-        self.dict.get(key)
+        self.map.get(key)
     }
 
     pub fn get_u32(&self, key: &str) -> Option<u32> {
