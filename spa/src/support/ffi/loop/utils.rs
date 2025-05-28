@@ -417,11 +417,9 @@ impl LoopUtilsCIface {
         c_source
     }
 
-    extern "C" fn update_io(object: *mut c_void, source: *mut CSource, mask: u32) -> c_int {
+    extern "C" fn update_io(object: *mut c_void, c_source: *mut CSource, mask: u32) -> c_int {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
-
-        let c_source = source as *mut CSource;
         let source = iface.sources.get_mut(&c_source).unwrap();
 
         let res = loop_utils.update_io(source, mask);
@@ -452,11 +450,10 @@ impl LoopUtilsCIface {
         c_source
     }
 
-    extern "C" fn enable_idle(object: *mut c_void, source: *mut CSource, enabled: bool) -> c_int {
+    extern "C" fn enable_idle(object: *mut c_void, c_source: *mut CSource, enabled: bool) -> c_int {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
 
-        let c_source = source as *mut CSource;
         let source = iface.sources.get_mut(&c_source).unwrap();
 
         let res = loop_utils.enable_idle(source, enabled);
@@ -487,11 +484,10 @@ impl LoopUtilsCIface {
         c_source
     }
 
-    extern "C" fn signal_event(object: *mut c_void, source: *mut CSource) -> c_int {
+    extern "C" fn signal_event(object: *mut c_void, c_source: *mut CSource) -> c_int {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
 
-        let c_source = source as *mut CSource;
         let source = iface.sources.get_mut(&c_source).unwrap();
 
         let res = loop_utils.signal_event(source);
@@ -524,7 +520,7 @@ impl LoopUtilsCIface {
 
     extern "C" fn update_timer(
         object: *mut c_void,
-        source: *mut CSource,
+        c_source: *mut CSource,
         value: &libc::timespec,
         interval: &libc::timespec,
         absolute: bool,
@@ -532,7 +528,6 @@ impl LoopUtilsCIface {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
 
-        let c_source = source as *mut CSource;
         let source = iface.sources.get_mut(&c_source).unwrap();
 
         let res = loop_utils.update_timer(source, value, interval, absolute);
@@ -566,11 +561,10 @@ impl LoopUtilsCIface {
         c_source
     }
 
-    extern "C" fn destroy_source(object: *mut c_void, source: *mut CSource) {
+    extern "C" fn destroy_source(object: *mut c_void, c_source: *mut CSource) {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
 
-        let c_source = source as *mut CSource;
         let source = iface.sources.remove(&c_source).unwrap();
 
         loop_utils.destroy_source(source)
