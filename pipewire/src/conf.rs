@@ -114,10 +114,10 @@ fn spa_json_parse(config: &str) -> std::io::Result<String> {
         })?;
 
     if !output.status.success() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("spa-json-dump failed with status: {}", output.status),
-        ));
+        return Err(std::io::Error::other(format!(
+            "spa-json-dump failed with status: {}",
+            output.status
+        )));
     }
 
     let json_output = String::from_utf8(output.stdout).map_err(|e| {
