@@ -23,6 +23,17 @@ pub struct HookList<T> {
 }
 
 impl<T> HookList<T> {
+    // The return value is an Rc<RefCell<...>> because:
+    //
+    //   1. Rc<> allows us to clone() the hooklist before emission, so that we can mutably borrow
+    //      the list (because the callbacks structure needs to be mutably borrowed, as the callback
+    //      can be an FnMut, which needs to be mutably borrowed when called)
+    //
+    //   2. RefCell<> is then needed inside the Rc, so that we can mutate it at all.
+    //
+    // We might want to explore alternatives that let us push the RefCell<> all the way into the
+    // callbacks structure itself, so each callback can individually be mutably borrowed, so that
+    // one callback can call another callback if needed.
     pub fn new() -> Rc<RefCell<HookList<T>>> {
         Rc::new(RefCell::new(HookList {
             hooks: LinkedList::new(),
