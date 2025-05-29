@@ -380,11 +380,6 @@ impl CSystemImpl {
 
         if res < 0 {
             Err(std::io::Error::last_os_error())
-        } else if res != 8 {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "read eventfd returned unexpected size",
-            ))
         } else {
             Ok(buf)
         }
@@ -400,11 +395,6 @@ impl CSystemImpl {
 
         if res < 0 {
             Err(std::io::Error::last_os_error())
-        } else if res != 8 {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "write eventfd returned unexpected size",
-            ))
         } else {
             Ok(0)
         }
