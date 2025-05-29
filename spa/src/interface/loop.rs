@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use crate::interface::ffi::{CControlHooks, CHook};
-use std::{any::Any, os::fd::RawFd, pin::Pin};
+use std::{any::Any, os::fd::RawFd, pin::Pin, time::Duration};
 
 use super::plugin::Interface;
 
@@ -74,7 +74,7 @@ pub struct LoopControlMethodsImpl {
     pub add_hook: fn(&LoopControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64),
     pub enter: fn(&LoopControlMethodsImpl),
     pub leave: fn(&LoopControlMethodsImpl),
-    pub iterate: fn(&LoopControlMethodsImpl) -> i32,
+    pub iterate: fn(&LoopControlMethodsImpl, timeout: Option<Duration>) -> i32,
     pub check: fn(&LoopControlMethodsImpl) -> i32,
 }
 
@@ -95,8 +95,8 @@ impl LoopControlMethodsImpl {
         (self.leave)(self)
     }
 
-    pub fn iterate(&self) -> i32 {
-        (self.iterate)(self)
+    pub fn iterate(&self, timeout: Option<Duration>) -> i32 {
+        (self.iterate)(self, timeout)
     }
 
     pub fn check(&self) -> i32 {
