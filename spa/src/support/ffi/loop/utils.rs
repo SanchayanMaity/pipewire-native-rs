@@ -103,7 +103,7 @@ impl CLoopUtilsImpl {
 
     #[no_mangle]
     extern "C" fn source_io_trampoline(data: *mut c_void, fd: c_int, mask: c_uint) {
-        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut LoopUtilsSource).as_mut().unwrap() };
 
         let func = match source.cb {
             LoopUtilsSourceCb::Io(ref mut f) => f,
@@ -135,7 +135,7 @@ impl CLoopUtilsImpl {
                 mask,
                 close,
                 Self::source_io_trampoline,
-                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+                &mut *source as *mut LoopUtilsSource as *mut c_void,
             )
         };
 
@@ -161,7 +161,7 @@ impl CLoopUtilsImpl {
 
     #[no_mangle]
     extern "C" fn source_idle_trampoline(data: *mut c_void) {
-        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut LoopUtilsSource).as_mut().unwrap() };
 
         let func = match source.cb {
             LoopUtilsSourceCb::Idle(ref mut f) => f,
@@ -189,7 +189,7 @@ impl CLoopUtilsImpl {
                 loop_utils.iface.cb.data,
                 enabled,
                 Self::source_idle_trampoline,
-                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+                &mut *source as *mut LoopUtilsSource as *mut c_void,
             )
         };
 
@@ -215,7 +215,7 @@ impl CLoopUtilsImpl {
 
     #[no_mangle]
     extern "C" fn source_event_trampoline(data: *mut c_void, count: c_ulong) {
-        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut LoopUtilsSource).as_mut().unwrap() };
 
         let func = match source.cb {
             LoopUtilsSourceCb::Event(ref mut f) => f,
@@ -241,7 +241,7 @@ impl CLoopUtilsImpl {
             ((*funcs).add_event)(
                 loop_utils.iface.cb.data,
                 Self::source_event_trampoline,
-                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+                &mut *source as *mut LoopUtilsSource as *mut c_void,
             )
         };
 
@@ -266,7 +266,7 @@ impl CLoopUtilsImpl {
 
     #[no_mangle]
     extern "C" fn source_timer_trampoline(data: *mut c_void, expirations: c_ulong) {
-        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut LoopUtilsSource).as_mut().unwrap() };
 
         let func = match source.cb {
             LoopUtilsSourceCb::Timer(ref mut f) => f,
@@ -292,7 +292,7 @@ impl CLoopUtilsImpl {
             ((*funcs).add_timer)(
                 loop_utils.iface.cb.data,
                 Self::source_timer_trampoline,
-                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+                &mut *source as *mut LoopUtilsSource as *mut c_void,
             )
         };
 
@@ -322,7 +322,7 @@ impl CLoopUtilsImpl {
 
     #[no_mangle]
     extern "C" fn source_signal_trampoline(data: *mut c_void, signal_number: c_int) {
-        let source = unsafe { (data as *mut Pin<Box<LoopUtilsSource>>).as_mut().unwrap() };
+        let source = unsafe { (data as *mut LoopUtilsSource).as_mut().unwrap() };
 
         let func = match source.cb {
             LoopUtilsSourceCb::Signal(ref mut f) => f,
@@ -350,7 +350,7 @@ impl CLoopUtilsImpl {
                 loop_utils.iface.cb.data,
                 signal_number,
                 Self::source_signal_trampoline,
-                &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
+                &mut *source as *mut LoopUtilsSource as *mut c_void,
             )
         };
 
