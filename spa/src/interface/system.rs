@@ -103,7 +103,7 @@ pub struct SystemImpl {
         fd: RawFd,
         flags: i32,
         new_value: &libc::itimerspec,
-        old_value: &mut libc::itimerspec,
+        old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32>,
     pub timerfd_gettime:
         fn(this: &SystemImpl, fd: RawFd, curr_value: &mut libc::itimerspec) -> std::io::Result<i32>,
@@ -196,7 +196,7 @@ impl SystemImpl {
         fd: RawFd,
         flags: i32,
         new_value: &libc::itimerspec,
-        old_value: &mut libc::itimerspec,
+        old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32> {
         (self.timerfd_settime)(self, fd, flags, new_value, old_value)
     }

@@ -162,8 +162,13 @@ impl System {
         fd: RawFd,
         flags: i32,
         new_value: &libc::itimerspec,
-        old_value: &mut libc::itimerspec,
+        old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32> {
+        let old_value = match old_value {
+            Some(v) => v as *mut libc::itimerspec,
+            None => std::ptr::null_mut(),
+        };
+
         let res = unsafe { libc::timerfd_settime(fd, flags, new_value, old_value) };
         result_or_error(res)
     }
