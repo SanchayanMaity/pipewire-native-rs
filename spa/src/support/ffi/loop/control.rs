@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
 
 use std::ffi::{c_int, c_uint, c_void, CString};
+use std::time::Duration;
 
 use crate::interface::ffi::{CControlHooks, CHook};
 use crate::interface::r#loop::*;
@@ -19,7 +20,7 @@ struct CControlMethodsMethods {
         extern "C" fn(object: *mut c_void, hook: &CHook, hooks: &CControlHooks, data: *mut c_void),
     enter: extern "C" fn(object: *mut c_void),
     leave: extern "C" fn(object: *mut c_void),
-    iterate: extern "C" fn(object: *mut c_void) -> c_int,
+    iterate: extern "C" fn(object: *mut c_void, timeout: c_int) -> c_int,
     check: extern "C" fn(object: *mut c_void) -> c_int,
 }
 
@@ -91,12 +92,23 @@ impl CLoopControlMethodsImpl {
         }
     }
 
-    fn iterate(this: &LoopControlMethodsImpl) -> i32 {
+    fn iterate(this: &LoopControlMethodsImpl, timeout: Option<Duration>) -> i32 {
         unsafe {
             let control_impl = Self::from_control_methods(this);
             let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-            ((*funcs).iterate)(control_impl.iface.cb.data)
+            let timeout: i32 = match timeout {
+                Some(t) => {
+                    if t == Duration::MAX {
+                        -1
+                    } else {
+                        t.as_millis() as i32
+                    }
+                }
+                None => 0,
+            };
+
+            ((*funcs).iterate)(control_impl.iface.cb.data, timeout)
         }
     }
 
@@ -157,10 +169,18 @@ impl ControlMethodsIface {
         control_methods_impl.leave()
     }
 
-    extern "C" fn iterate(object: *mut c_void) -> c_int {
+    extern "C" fn iterate(object: *mut c_void, timeout: c_int) -> c_int {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
-        control_methods_impl.iterate()
+        let t = if timeout == 0 {
+            Duration::new(0, 0)
+        } else if timeout == -1 {
+            Duration::MAX
+        } else {
+            Duration::from_millis(timeout as u64)
+        };
+
+        control_methods_impl.iterate(Some(t))
     }
 
     extern "C" fn check(object: *mut c_void) -> c_int {
