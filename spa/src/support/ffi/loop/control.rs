@@ -24,31 +24,31 @@ struct CControlMethodsMethods {
 }
 
 #[repr(C)]
-struct CControlMethods {
+struct CLoopControlMethods {
     iface: CInterface,
 }
 
-struct CControlMethodsImpl {}
+struct CLoopControlMethodsImpl {}
 
 pub fn new_impl(interface: *mut CInterface) -> LoopControlMethodsImpl {
     LoopControlMethodsImpl {
-        inner: Box::pin(interface as *mut CControlMethods),
+        inner: Box::pin(interface as *mut CLoopControlMethods),
 
-        get_fd: CControlMethodsImpl::get_fd,
-        add_hook: CControlMethodsImpl::add_hook,
-        enter: CControlMethodsImpl::enter,
-        leave: CControlMethodsImpl::leave,
-        iterate: CControlMethodsImpl::iterate,
-        check: CControlMethodsImpl::check,
+        get_fd: CLoopControlMethodsImpl::get_fd,
+        add_hook: CLoopControlMethodsImpl::add_hook,
+        enter: CLoopControlMethodsImpl::enter,
+        leave: CLoopControlMethodsImpl::leave,
+        iterate: CLoopControlMethodsImpl::iterate,
+        check: CLoopControlMethodsImpl::check,
     }
 }
 
-impl CControlMethodsImpl {
-    fn from_control_methods(this: &LoopControlMethodsImpl) -> &CControlMethods {
+impl CLoopControlMethodsImpl {
+    fn from_control_methods(this: &LoopControlMethodsImpl) -> &CLoopControlMethods {
         unsafe {
             this.inner
                 .as_ref()
-                .downcast_ref::<*mut CControlMethods>()
+                .downcast_ref::<*mut CLoopControlMethods>()
                 .unwrap()
                 .as_ref()
                 .unwrap()
@@ -171,9 +171,11 @@ impl ControlMethodsIface {
 }
 
 pub(crate) unsafe fn make_native(loop_ctrl: &LoopControlMethodsImpl) -> *mut CInterface {
-    let c_ctrl_methods: *mut CControlMethods = unsafe {
-        libc::calloc(1, std::mem::size_of::<CControlMethods>() as libc::size_t)
-            as *mut CControlMethods
+    let c_ctrl_methods: *mut CLoopControlMethods = unsafe {
+        libc::calloc(
+            1,
+            std::mem::size_of::<CLoopControlMethods>() as libc::size_t,
+        ) as *mut CLoopControlMethods
     };
     let c_ctrl_methods = unsafe { &mut *c_ctrl_methods };
 
@@ -183,7 +185,7 @@ pub(crate) unsafe fn make_native(loop_ctrl: &LoopControlMethodsImpl) -> *mut CIn
         &LOOP_CONTROL_METHODS as *const CControlMethodsMethods as *mut c_void;
     c_ctrl_methods.iface.cb.data = loop_ctrl as *const LoopControlMethodsImpl as *mut c_void;
 
-    c_ctrl_methods as *mut CControlMethods as *mut CInterface
+    c_ctrl_methods as *mut CLoopControlMethods as *mut CInterface
 }
 
 pub(crate) unsafe fn free_native(c_loop_ctrl: *mut CInterface) {
