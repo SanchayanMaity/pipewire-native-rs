@@ -125,7 +125,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Io(func),
-            inner: Box::new(std::ptr::null_mut() as *mut CSource),
+            inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
         let c_source = unsafe {
@@ -181,7 +181,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Idle(func),
-            inner: Box::new(std::ptr::null_mut() as *mut CSource),
+            inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
         let c_source = unsafe {
@@ -234,7 +234,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Event(func),
-            inner: Box::new(std::ptr::null_mut() as *mut CSource),
+            inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
         let c_source = unsafe {
@@ -285,7 +285,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Timer(func),
-            inner: Box::new(std::ptr::null_mut() as *mut CSource),
+            inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
         let c_source = unsafe {
@@ -342,7 +342,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Signal(func),
-            inner: Box::new(std::ptr::null_mut() as *mut CSource),
+            inner: Box::new(std::ptr::null_mut::<CSource>()),
         });
 
         let c_source = unsafe {
