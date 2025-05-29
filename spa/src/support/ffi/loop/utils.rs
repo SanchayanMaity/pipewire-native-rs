@@ -125,7 +125,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Io(func),
-            inner: std::ptr::null_mut(),
+            inner: Box::new(std::ptr::null_mut() as *mut CSource),
         });
 
         let c_source = unsafe {
@@ -142,7 +142,7 @@ impl CLoopUtilsImpl {
         if c_source.is_null() {
             None
         } else {
-            source.inner = c_source;
+            source.inner = Box::new(c_source);
             Some(source)
         }
     }
@@ -154,7 +154,7 @@ impl CLoopUtilsImpl {
     ) -> std::io::Result<i32> {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
-        let source = source.inner;
+        let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         result_from(unsafe { ((*funcs).update_io)(loop_utils.iface.cb.data, source, mask) })
     }
@@ -181,7 +181,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Idle(func),
-            inner: std::ptr::null_mut(),
+            inner: Box::new(std::ptr::null_mut() as *mut CSource),
         });
 
         let c_source = unsafe {
@@ -196,7 +196,7 @@ impl CLoopUtilsImpl {
         if c_source.is_null() {
             None
         } else {
-            source.inner = c_source;
+            source.inner = Box::new(c_source);
             Some(source)
         }
     }
@@ -208,7 +208,7 @@ impl CLoopUtilsImpl {
     ) -> std::io::Result<i32> {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
-        let source = source.inner;
+        let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         result_from(unsafe { ((*funcs).enable_idle)(loop_utils.iface.cb.data, source, enabled) })
     }
@@ -234,7 +234,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Event(func),
-            inner: std::ptr::null_mut(),
+            inner: Box::new(std::ptr::null_mut() as *mut CSource),
         });
 
         let c_source = unsafe {
@@ -248,7 +248,7 @@ impl CLoopUtilsImpl {
         if c_source.is_null() {
             None
         } else {
-            source.inner = c_source;
+            source.inner = Box::new(c_source);
             Some(source)
         }
     }
@@ -259,7 +259,7 @@ impl CLoopUtilsImpl {
     ) -> std::io::Result<i32> {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
-        let source = source.inner;
+        let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         result_from(unsafe { ((*funcs).signal_event)(loop_utils.iface.cb.data, source) })
     }
@@ -285,7 +285,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Timer(func),
-            inner: std::ptr::null_mut(),
+            inner: Box::new(std::ptr::null_mut() as *mut CSource),
         });
 
         let c_source = unsafe {
@@ -299,7 +299,7 @@ impl CLoopUtilsImpl {
         if c_source.is_null() {
             None
         } else {
-            source.inner = c_source;
+            source.inner = Box::new(c_source);
             Some(source)
         }
     }
@@ -313,7 +313,7 @@ impl CLoopUtilsImpl {
     ) -> std::io::Result<i32> {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
-        let source = source.inner;
+        let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         result_from(unsafe {
             ((*funcs).update_timer)(loop_utils.iface.cb.data, source, value, interval, absolute)
@@ -342,7 +342,7 @@ impl CLoopUtilsImpl {
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Signal(func),
-            inner: std::ptr::null_mut(),
+            inner: Box::new(std::ptr::null_mut() as *mut CSource),
         });
 
         let c_source = unsafe {
@@ -357,7 +357,7 @@ impl CLoopUtilsImpl {
         if c_source.is_null() {
             None
         } else {
-            source.inner = c_source;
+            source.inner = Box::new(c_source);
             Some(source)
         }
     }
@@ -365,7 +365,7 @@ impl CLoopUtilsImpl {
     fn destroy_source(this: &LoopUtilsImpl, source: Pin<Box<LoopUtilsSource>>) {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
-        let c_source = source.inner;
+        let c_source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         unsafe {
             ((*funcs).destroy_source)(loop_utils.iface.cb.data, c_source);
@@ -403,7 +403,7 @@ impl LoopUtilsCIface {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
-        let c_source = source.inner;
+        let c_source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         iface.sources.insert(c_source, source);
 
@@ -436,7 +436,7 @@ impl LoopUtilsCIface {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
-        let c_source = source.inner;
+        let c_source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         iface.sources.insert(c_source, source);
 
@@ -469,8 +469,7 @@ impl LoopUtilsCIface {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
-
-        let c_source = source.inner;
+        let c_source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         iface.sources.insert(c_source, source);
 
@@ -503,8 +502,7 @@ impl LoopUtilsCIface {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
-
-        let c_source = source.inner;
+        let c_source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         iface.sources.insert(c_source, source);
 
@@ -546,8 +544,7 @@ impl LoopUtilsCIface {
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
-
-        let c_source = source.inner;
+        let c_source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
         iface.sources.insert(c_source, source);
 

@@ -5,7 +5,7 @@
 use crate::interface::ffi::{CControlHooks, CHook};
 use std::{any::Any, os::fd::RawFd, pin::Pin};
 
-use super::{ffi::CSource, plugin::Interface};
+use super::plugin::Interface;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Source {
@@ -130,7 +130,7 @@ pub enum LoopUtilsSourceCb {
 
 pub struct LoopUtilsSource {
     pub cb: LoopUtilsSourceCb,
-    pub inner: *mut CSource,
+    pub inner: Box<dyn Any>,
 }
 
 #[allow(clippy::type_complexity)]
