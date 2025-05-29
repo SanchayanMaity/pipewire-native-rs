@@ -48,7 +48,7 @@ impl CControlMethodsImpl {
         unsafe {
             this.inner
                 .as_ref()
-                .downcast_ref::<*const CControlMethods>()
+                .downcast_ref::<*mut CControlMethods>()
                 .unwrap()
                 .as_ref()
                 .unwrap()

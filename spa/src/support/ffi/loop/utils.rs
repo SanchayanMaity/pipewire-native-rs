@@ -70,15 +70,11 @@ struct CLoopUtils {
     iface: CInterface,
 }
 
-struct CLoopUtilsImpl {
-    iface: *mut CLoopUtils,
-}
+struct CLoopUtilsImpl {}
 
 pub fn new_impl(interface: *mut CInterface) -> LoopUtilsImpl {
     LoopUtilsImpl {
-        inner: Box::pin(CLoopUtilsImpl {
-            iface: interface as *mut CLoopUtils,
-        }),
+        inner: Box::pin(interface as *mut CLoopUtils),
 
         add_io: CLoopUtilsImpl::add_io,
         update_io: CLoopUtilsImpl::update_io,
@@ -94,18 +90,15 @@ pub fn new_impl(interface: *mut CInterface) -> LoopUtilsImpl {
 }
 
 impl CLoopUtilsImpl {
-    fn from_loop_utils(this: &LoopUtilsImpl) -> (&mut CLoopUtilsImpl, &mut CLoopUtils) {
-        let c_looputils_impl = unsafe {
+    fn from_loop_utils(this: &LoopUtilsImpl) -> &CLoopUtils {
+        unsafe {
             this.inner
                 .as_ref()
-                .downcast_ref::<*mut CLoopUtilsImpl>()
+                .downcast_ref::<*mut CLoopUtils>()
                 .unwrap()
-                .as_mut()
+                .as_ref()
                 .unwrap()
-        };
-        let c_looputils = unsafe { c_looputils_impl.iface.as_mut().unwrap() };
-
-        (c_looputils_impl, c_looputils)
+        }
     }
 
     #[no_mangle]
@@ -127,8 +120,8 @@ impl CLoopUtilsImpl {
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        let (_, utils) = Self::from_loop_utils(this);
-        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Io(func),
@@ -137,7 +130,7 @@ impl CLoopUtilsImpl {
 
         let c_source = unsafe {
             ((*funcs).add_io)(
-                utils.iface.cb.data,
+                loop_utils.iface.cb.data,
                 fd,
                 mask,
                 close,
@@ -159,11 +152,11 @@ impl CLoopUtilsImpl {
         source: &mut Pin<Box<LoopUtilsSource>>,
         mask: u32,
     ) -> std::io::Result<i32> {
-        let utils_impl = Self::from_loop_utils(this).1;
-        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = source.inner;
 
-        result_from(unsafe { ((*funcs).update_io)(utils_impl.iface.cb.data, source, mask) })
+        result_from(unsafe { ((*funcs).update_io)(loop_utils.iface.cb.data, source, mask) })
     }
 
     #[no_mangle]
@@ -183,8 +176,8 @@ impl CLoopUtilsImpl {
         enabled: bool,
         func: Box<SourceIdleFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        let (_, utils) = Self::from_loop_utils(this);
-        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Idle(func),
@@ -193,7 +186,7 @@ impl CLoopUtilsImpl {
 
         let c_source = unsafe {
             ((*funcs).add_idle)(
-                utils.iface.cb.data,
+                loop_utils.iface.cb.data,
                 enabled,
                 Self::source_idle_trampoline,
                 &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
@@ -213,11 +206,11 @@ impl CLoopUtilsImpl {
         source: &mut Pin<Box<LoopUtilsSource>>,
         enabled: bool,
     ) -> std::io::Result<i32> {
-        let utils_impl = Self::from_loop_utils(this).1;
-        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = source.inner;
 
-        result_from(unsafe { ((*funcs).enable_idle)(utils_impl.iface.cb.data, source, enabled) })
+        result_from(unsafe { ((*funcs).enable_idle)(loop_utils.iface.cb.data, source, enabled) })
     }
 
     #[no_mangle]
@@ -236,8 +229,8 @@ impl CLoopUtilsImpl {
         this: &LoopUtilsImpl,
         func: Box<SourceEventFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        let (_, utils) = Self::from_loop_utils(this);
-        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Event(func),
@@ -246,7 +239,7 @@ impl CLoopUtilsImpl {
 
         let c_source = unsafe {
             ((*funcs).add_event)(
-                utils.iface.cb.data,
+                loop_utils.iface.cb.data,
                 Self::source_event_trampoline,
                 &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
             )
@@ -264,11 +257,11 @@ impl CLoopUtilsImpl {
         this: &LoopUtilsImpl,
         source: &mut Pin<Box<LoopUtilsSource>>,
     ) -> std::io::Result<i32> {
-        let utils_impl = Self::from_loop_utils(this).1;
-        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = source.inner;
 
-        result_from(unsafe { ((*funcs).signal_event)(utils_impl.iface.cb.data, source) })
+        result_from(unsafe { ((*funcs).signal_event)(loop_utils.iface.cb.data, source) })
     }
 
     #[no_mangle]
@@ -287,8 +280,8 @@ impl CLoopUtilsImpl {
         this: &LoopUtilsImpl,
         func: Box<SourceTimerFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        let (_, utils) = Self::from_loop_utils(this);
-        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Timer(func),
@@ -297,7 +290,7 @@ impl CLoopUtilsImpl {
 
         let c_source = unsafe {
             ((*funcs).add_timer)(
-                utils.iface.cb.data,
+                loop_utils.iface.cb.data,
                 Self::source_timer_trampoline,
                 &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
             )
@@ -318,12 +311,12 @@ impl CLoopUtilsImpl {
         interval: &libc::timespec,
         absolute: bool,
     ) -> std::io::Result<i32> {
-        let utils_impl = Self::from_loop_utils(this).1;
-        let funcs = utils_impl.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = source.inner;
 
         result_from(unsafe {
-            ((*funcs).update_timer)(utils_impl.iface.cb.data, source, value, interval, absolute)
+            ((*funcs).update_timer)(loop_utils.iface.cb.data, source, value, interval, absolute)
         })
     }
 
@@ -344,8 +337,8 @@ impl CLoopUtilsImpl {
         signal_number: i32,
         func: Box<SourceSignalFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        let (_, utils) = Self::from_loop_utils(this);
-        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
 
         let mut source = Box::pin(LoopUtilsSource {
             cb: LoopUtilsSourceCb::Signal(func),
@@ -354,7 +347,7 @@ impl CLoopUtilsImpl {
 
         let c_source = unsafe {
             ((*funcs).add_signal)(
-                utils.iface.cb.data,
+                loop_utils.iface.cb.data,
                 signal_number,
                 Self::source_signal_trampoline,
                 &mut source as *mut Pin<Box<LoopUtilsSource>> as *mut c_void,
@@ -370,12 +363,12 @@ impl CLoopUtilsImpl {
     }
 
     fn destroy_source(this: &LoopUtilsImpl, source: Pin<Box<LoopUtilsSource>>) {
-        let (_, utils) = Self::from_loop_utils(this);
-        let funcs = utils.iface.cb.funcs as *const CLoopUtilsMethods;
+        let loop_utils = Self::from_loop_utils(this);
+        let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let c_source = source.inner;
 
         unsafe {
-            ((*funcs).destroy_source)(utils.iface.cb.data, c_source);
+            ((*funcs).destroy_source)(loop_utils.iface.cb.data, c_source);
         }
     }
 }
