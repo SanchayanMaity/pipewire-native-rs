@@ -12,16 +12,22 @@ use pipewire_native_spa::interface::r#loop::{LoopControlMethodsImpl, LoopImpl, L
 use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
 
-#[test]
-fn test_load_support() {
-    let mut support = interface::Support::new();
-
+fn init_support() -> (interface::Support, ffi::plugin::Plugin) {
     let plugin_path = std::env::var("SPA_TEST_PLUGIN_PATH")
         .unwrap_or("/usr/lib64/spa-0.2/support/libspa-support.so".to_string());
 
     let plugin =
         ffi::plugin::load(&PathBuf::from(plugin_path)).expect("Plugin loading should not fail");
 
+    let support = interface::Support::new();
+
+    (support, plugin)
+}
+
+fn setup_log(
+    support: &mut interface::Support,
+    plugin: &ffi::plugin::Plugin,
+) -> Box<dyn interface::plugin::Handle> {
     let log_factory = plugin
         .find_factory(interface::plugin::LOG_FACTORY)
         .expect("Should find log factory");
@@ -38,7 +44,7 @@ fn test_load_support() {
                 ("log.level".to_string(), "7".to_string()),
                 ("log.line".to_string(), true.to_string()),
             ])),
-            &support,
+            support,
         )
         .expect("Log factory loading should succeed");
 
@@ -67,6 +73,13 @@ fn test_load_support() {
 
     support.add_interface(interface::LOG, log);
 
+    log_handle
+}
+
+fn setup_system(
+    support: &mut interface::Support,
+    plugin: &ffi::plugin::Plugin,
+) -> Box<dyn interface::plugin::Handle> {
     let system_factory = plugin
         .find_factory(interface::plugin::SYSTEM_FACTORY)
         .expect("Should find system factory");
@@ -75,7 +88,7 @@ fn test_load_support() {
     assert_eq!(interfaces.len(), 1);
 
     let system_handle = system_factory
-        .init(None, &support)
+        .init(None, support)
         .expect("System factory loading should succeed");
 
     let system_iface = system_handle
@@ -88,6 +101,13 @@ fn test_load_support() {
 
     support.add_interface(interface::SYSTEM, system);
 
+    system_handle
+}
+
+fn setup_cpu(
+    support: &mut interface::Support,
+    plugin: &ffi::plugin::Plugin,
+) -> Box<dyn interface::plugin::Handle> {
     let cpu_factory = plugin
         .find_factory(interface::plugin::CPU_FACTORY)
         .expect("Should find cpu factory");
@@ -96,7 +116,7 @@ fn test_load_support() {
     assert_eq!(interfaces.len(), 1);
 
     let cpu_handle = cpu_factory
-        .init(None, &support)
+        .init(None, support)
         .expect("CPU factory loading should succeed");
 
     let cpu_iface = cpu_handle
@@ -109,6 +129,13 @@ fn test_load_support() {
 
     support.add_interface(interface::CPU, cpu);
 
+    cpu_handle
+}
+
+fn setup_loop(
+    support: &mut interface::Support,
+    plugin: &ffi::plugin::Plugin,
+) -> Box<dyn interface::plugin::Handle> {
     let loop_factory = plugin
         .find_factory(interface::plugin::LOOP_FACTORY)
         .expect("Should find loop factory");
@@ -117,7 +144,7 @@ fn test_load_support() {
     assert_eq!(interfaces.len(), 3);
 
     let loop_handle = loop_factory
-        .init(None, &support)
+        .init(None, support)
         .expect("Loop factory loading should succeed");
 
     let loop_iface = loop_handle
@@ -130,6 +157,13 @@ fn test_load_support() {
 
     support.add_interface(interface::LOOP, r#loop);
 
+    loop_handle
+}
+
+fn setup_loop_ctrl(
+    support: &mut interface::Support,
+    loop_handle: &Box<dyn interface::plugin::Handle>,
+) {
     let loop_ctrl_iface = loop_handle
         .get_interface(interface::LOOP_CONTROL)
         .expect("Loop factory should produce control interface");
@@ -139,7 +173,12 @@ fn test_load_support() {
         .expect("Loop control interface should be LoopControlMethodsImpl");
 
     support.add_interface(interface::LOOP_CONTROL, loop_ctrl);
+}
 
+fn setup_loop_utils(
+    support: &mut interface::Support,
+    loop_handle: &Box<dyn interface::plugin::Handle>,
+) {
     let loop_utils_iface = loop_handle
         .get_interface(interface::LOOP_UTILS)
         .expect("Loop factory should produce utils interface");
@@ -149,4 +188,17 @@ fn test_load_support() {
         .expect("Loop utils interface should be LoopUtilsImpl");
 
     support.add_interface(interface::LOOP_UTILS, loop_utils);
+}
+
+#[test]
+fn test_load_support() {
+    let (mut support, plugin) = init_support();
+
+    let _log_handle = setup_log(&mut support, &plugin);
+    let _system_handle = setup_system(&mut support, &plugin);
+    let _cpu_handle = setup_cpu(&mut support, &plugin);
+    let loop_handle = setup_loop(&mut support, &plugin);
+
+    setup_loop_ctrl(&mut support, &loop_handle);
+    setup_loop_utils(&mut support, &loop_handle);
 }
