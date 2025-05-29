@@ -301,11 +301,16 @@ impl CSystemImpl {
         fd: RawFd,
         flags: i32,
         new_value: &libc::itimerspec,
-        old_value: &mut libc::itimerspec,
+        old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32> {
         unsafe {
             let system = Self::from_system(this);
             let funcs = system.iface.cb.funcs as *const CSystemMethods;
+
+            let old_value = match old_value {
+                Some(v) => v as *mut libc::itimerspec,
+                None => std::ptr::null_mut(),
+            };
 
             result_or_error(((*funcs).timerfd_settime)(
                 system.iface.cb.data,
@@ -636,9 +641,13 @@ impl SystemImplCIface {
     ) -> i32 {
         let system = Self::c_to_system_impl(object);
 
-        let res = system.timerfd_settime(fd, flags, unsafe { &*new_value }, unsafe {
-            &mut *old_value
-        });
+        let old_value = if old_value.is_null() {
+            None
+        } else {
+            unsafe { Some(&mut *old_value) }
+        };
+
+        let res = system.timerfd_settime(fd, flags, unsafe { &*new_value }, old_value);
 
         res.unwrap_or(-1)
     }
