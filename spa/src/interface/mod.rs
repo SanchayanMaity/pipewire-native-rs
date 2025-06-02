@@ -23,14 +23,16 @@ pub mod log;
 pub mod r#loop;
 pub mod plugin;
 pub mod system;
+pub mod thread;
 
 /* Well-known interface names */
+pub const CPU: &str = "Spa:Pointer:Interface:CPU";
 pub const LOG: &str = "Spa:Pointer:Interface:Log";
 pub const LOOP: &str = "Spa:Pointer:Interface:Loop";
 pub const LOOP_CONTROL: &str = "Spa:Pointer:Interface:LoopControl";
 pub const LOOP_UTILS: &str = "Spa:Pointer:Interface:LoopUtils";
 pub const SYSTEM: &str = "Spa:Pointer:Interface:System";
-pub const CPU: &str = "Spa:Pointer:Interface:CPU";
+pub const THREAD_UTILS: &str = "Spa:Pointer:Interface:ThreadUtils";
 
 pub struct Support {
     supports: HashMap<&'static str, Rc<Pin<Box<dyn plugin::Interface>>>>,

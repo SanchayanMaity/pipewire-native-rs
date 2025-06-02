@@ -9,6 +9,7 @@ pub mod log;
 pub mod r#loop;
 pub mod plugin;
 pub mod system;
+pub mod thread;
 
 /* TODO: can we avoid an allocation here? */
 pub fn c_string(s: &str) -> CString {

@@ -10,6 +10,7 @@ pub mod ffi;
 pub mod r#loop;
 pub mod plugin;
 pub mod system;
+pub mod thread;
 
 static PLUGIN: LazyLock<Plugin> = LazyLock::new(Plugin::new);
 

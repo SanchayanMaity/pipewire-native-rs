@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-use super::system;
+use super::{system, thread};
 
 pub struct Plugin {}
 
@@ -60,6 +60,7 @@ impl Handle for PluginHandle {
     fn get_interface(&self, type_: &str) -> Option<Box<dyn Interface>> {
         match type_ {
             interface::SYSTEM => Some(Box::new(system::new())),
+            interface::THREAD_UTILS => Some(Box::new(thread::new_utils())),
             _ => None,
         }
     }

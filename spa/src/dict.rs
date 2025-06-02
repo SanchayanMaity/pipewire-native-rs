@@ -65,7 +65,7 @@ impl Dict {
         ret
     }
 
-    pub fn lookup(&self, key: &str) -> Option<&str> {
+    pub fn lookup<'a>(&'a self, key: &str) -> Option<&'a str> {
         let mut ret = None;
         let boxed = unsafe {
             let slice = std::slice::from_raw_parts_mut(self.items, self.n_items as usize);
