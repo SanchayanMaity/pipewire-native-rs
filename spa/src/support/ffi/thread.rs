@@ -109,19 +109,16 @@ impl ThreadUtilsCIface {
         let props = unsafe { props.as_ref() };
         let send_arg = SendablePtr { value: arg };
 
-        let thread = impl_.create(
-            props,
-            Box::new(move || {
-                // Get the argument to the function
-                let arg = send_arg;
+        let thread = impl_.create(props, move || {
+            // Get the argument to the function
+            let arg = send_arg;
 
-                // Run the function
-                let retval = start(arg.value);
+            // Run the function
+            let retval = start(arg.value);
 
-                // Pack the return value for send
-                Box::new(SendablePtr { value: retval })
-            }),
-        );
+            // Pack the return value for send
+            Box::new(SendablePtr { value: retval })
+        });
 
         match thread {
             Some(t) => Box::into_raw(t.inner) as *mut c_void as *mut CThread,

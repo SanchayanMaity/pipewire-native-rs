@@ -36,12 +36,11 @@ pub struct ThreadUtilsImpl {
 }
 
 impl ThreadUtilsImpl {
-    pub fn create(
-        &self,
-        props: Option<&Dict>,
-        start: Box<dyn FnOnce() -> ThreadReturn + Send + 'static>,
-    ) -> Option<Thread> {
-        (self.create)(self, props, start)
+    pub fn create<F>(&self, props: Option<&Dict>, start: F) -> Option<Thread>
+    where
+        F: FnOnce() -> ThreadReturn + Send + 'static,
+    {
+        (self.create)(self, props, Box::new(start))
     }
 
     pub fn join(&self, thread: Thread) -> std::io::Result<ThreadReturn> {
