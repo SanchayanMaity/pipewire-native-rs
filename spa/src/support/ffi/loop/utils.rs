@@ -132,7 +132,7 @@ impl CLoopUtilsImpl {
             ((*funcs).add_io)(
                 loop_utils.iface.cb.data,
                 fd,
-                u32::try_from(mask).unwrap(),
+                mask.bits(),
                 close,
                 Self::source_io_trampoline,
                 &mut *source as *mut LoopUtilsSource as *mut c_void,
@@ -156,13 +156,7 @@ impl CLoopUtilsImpl {
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
         let source = *source.inner.downcast_ref::<*mut CSource>().unwrap();
 
-        result_from(unsafe {
-            ((*funcs).update_io)(
-                loop_utils.iface.cb.data,
-                source,
-                u32::try_from(mask).unwrap(),
-            )
-        })
+        result_from(unsafe { ((*funcs).update_io)(loop_utils.iface.cb.data, source, mask.bits()) })
     }
 
     #[no_mangle]
@@ -405,7 +399,7 @@ impl LoopUtilsCIface {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
 
-        let Ok(io_mask) = SpaIo::try_from(mask) else {
+        let Some(io_mask) = SpaIo::from_bits(mask) else {
             return std::ptr::null_mut();
         };
 
@@ -430,7 +424,7 @@ impl LoopUtilsCIface {
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
         let source = iface.sources.get_mut(&c_source).unwrap();
 
-        let Ok(io_mask) = SpaIo::try_from(mask) else {
+        let Some(io_mask) = SpaIo::from_bits(mask) else {
             return -1;
         };
 
