@@ -14,6 +14,7 @@ use ffi::{CInterface, CSupport};
 use log::LogImpl;
 use r#loop::{LoopControlMethodsImpl, LoopImpl, LoopUtilsImpl};
 use system::SystemImpl;
+use thread::ThreadUtilsImpl;
 
 use crate::support;
 
@@ -111,6 +112,9 @@ impl Drop for Support {
                     SYSTEM => {
                         <SystemImpl as plugin::Interface>::free_native(s.data as *mut CInterface)
                     }
+                    THREAD_UTILS => <ThreadUtilsImpl as plugin::Interface>::free_native(
+                        s.data as *mut CInterface,
+                    ),
                     _ => unreachable!(),
                 }
             }
