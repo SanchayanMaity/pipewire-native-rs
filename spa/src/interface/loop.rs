@@ -3,32 +3,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
 use super::plugin::Interface;
-use crate::interface::ffi::{CControlHooks, CHook};
-use bitflags::bitflags;
+use crate::{
+    flags,
+    interface::ffi::{CControlHooks, CHook},
+};
 use std::{any::Any, os::fd::RawFd, pin::Pin, time::Duration};
 
-bitflags! {
-    #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct SpaIo: u32 {
-        const IN  = (1 << 0);
-        const OUT = (1 << 2);
-        const ERR = (1 << 3);
-        const HUP = (1 << 4);
-    }
-}
-
-bitflags! {
-    #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct SpaFd: u32 {
-        const CLOEXEC             = (1 << 0);
-        const NONBLOCK            = (1 << 1);
-        const EVENT_SEMAPHORE     = (1 << 2);
-        const TIMER_ABSTIME       = (1 << 3);
-        const TIMER_CANCEL_ON_SET = (1 << 4);
-    }
-}
 #[derive(Copy, Clone, Debug)]
 pub struct Source {
     pub fd: RawFd,
@@ -162,14 +142,14 @@ pub struct LoopUtilsImpl {
     pub add_io: fn(
         &LoopUtilsImpl,
         fd: RawFd,
-        mask: SpaIo,
+        mask: flags::Io,
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>>,
     pub update_io: fn(
         &LoopUtilsImpl,
         source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: SpaIo,
+        mask: flags::Io,
     ) -> std::io::Result<i32>,
     pub add_idle: fn(
         &LoopUtilsImpl,
@@ -206,7 +186,7 @@ impl LoopUtilsImpl {
     pub fn add_io(
         &self,
         fd: RawFd,
-        mask: SpaIo,
+        mask: flags::Io,
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
@@ -216,7 +196,7 @@ impl LoopUtilsImpl {
     pub fn update_io(
         &self,
         source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: SpaIo,
+        mask: flags::Io,
     ) -> std::io::Result<i32> {
         (self.update_io)(self, source, mask)
     }

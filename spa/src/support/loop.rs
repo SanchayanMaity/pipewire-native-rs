@@ -8,14 +8,14 @@ use std::io::{Error, ErrorKind};
 use std::os::fd::RawFd;
 use std::pin::Pin;
 
-use crate::interface;
 use crate::interface::plugin::HandleFactory;
 use crate::interface::r#loop::{LoopImpl, SourceFn};
 use crate::interface::system::SystemImpl;
 use crate::interface::{
     r#loop::{self, InvokeFn, Source},
-    system::{self, PollEvents},
+    system::{self},
 };
+use crate::{flags, interface};
 
 pub struct Loop {
     system: Box<SystemImpl>,
@@ -61,7 +61,7 @@ impl Loop {
 
         let fd = source.fd;
         let events =
-            PollEvents::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
+            flags::Io::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
         let mut source_ = Box::pin(*source);
         let data = Pin::into_inner(source_.as_mut()) as *mut Source as u64;
 
@@ -84,7 +84,7 @@ impl Loop {
             .get_mut(&fd)
             .ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?;
         let events =
-            PollEvents::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
+            flags::Io::from_bits(source.mask).ok_or(Error::from(ErrorKind::InvalidInput))?;
         let data = Pin::into_inner(entry.0.as_mut()) as *mut Source as u64;
 
         // Update the mask, as requested

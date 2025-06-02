@@ -7,10 +7,13 @@ use std::{
     os::fd::RawFd,
 };
 
-use crate::interface::{
-    self,
-    ffi::CInterface,
-    system::{result_or_error, PollEvent, PollEvents, SystemImpl},
+use crate::{
+    flags,
+    interface::{
+        self,
+        ffi::CInterface,
+        system::{result_or_error, PollEvent, SystemImpl},
+    },
 };
 
 use super::c_string;
@@ -38,14 +41,14 @@ struct CSystemMethods {
         object: *mut c_void,
         pfd: c_int,
         fd: c_int,
-        events: PollEvents,
+        events: flags::Io,
         data: *mut c_void,
     ) -> c_int,
     pollfd_mod: extern "C" fn(
         object: *mut c_void,
         pfd: c_int,
         fd: c_int,
-        events: PollEvents,
+        events: flags::Io,
         data: *mut c_void,
     ) -> c_int,
     pollfd_del: extern "C" fn(object: *mut c_void, pfd: c_int, fd: c_int) -> c_int,
@@ -212,7 +215,7 @@ impl CSystemImpl {
         this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32> {
         unsafe {
@@ -233,7 +236,7 @@ impl CSystemImpl {
         this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32> {
         unsafe {
@@ -559,7 +562,7 @@ impl SystemImplCIface {
         object: *mut c_void,
         pfd: c_int,
         fd: c_int,
-        events: PollEvents,
+        events: flags::Io,
         data: *mut c_void,
     ) -> i32 {
         let system = Self::c_to_system_impl(object);
@@ -573,7 +576,7 @@ impl SystemImplCIface {
         object: *mut c_void,
         pfd: c_int,
         fd: c_int,
-        events: PollEvents,
+        events: flags::Io,
         data: *mut c_void,
     ) -> i32 {
         let system = Self::c_to_system_impl(object);

@@ -4,7 +4,10 @@
 
 use std::{io::Error, os::fd::RawFd};
 
-use crate::interface::system::{result_or_error, PollEvent, PollEvents, SystemImpl};
+use crate::{
+    flags,
+    interface::system::{result_or_error, PollEvent, SystemImpl},
+};
 
 struct System {}
 
@@ -83,7 +86,7 @@ impl System {
         _this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32> {
         let mut event = libc::epoll_event {
@@ -105,7 +108,7 @@ impl System {
         _this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32> {
         let mut event = libc::epoll_event {

@@ -4,13 +4,13 @@
 
 use std::{any::Any, os::fd::RawFd, pin::Pin};
 
-use bitflags::bitflags;
+use crate::flags;
 
 use super::plugin::Interface;
 
 #[repr(C, packed(1))]
 pub struct PollEvent {
-    pub events: PollEvents,
+    pub events: flags::Io,
     pub data: u64,
 }
 
@@ -23,25 +23,6 @@ pub const EVENTFD_NONBLOCK: i32 = libc::EFD_NONBLOCK;
 pub const EVENTFD_SEMAPHORE: i32 = libc::EFD_SEMAPHORE;
 pub const SIGNALFD_CLOEXEC: i32 = libc::SFD_CLOEXEC;
 pub const SIGNALFD_NONBLOCK: i32 = libc::SFD_NONBLOCK;
-
-bitflags! {
-    #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct PollEvents: u32 {
-        /* Events */
-        const IN = libc::EPOLLIN as u32;
-        const PRI = libc::EPOLLPRI as u32;
-        const OUT = libc::EPOLLOUT as u32;
-        const ERR = libc::EPOLLERR as u32;
-        const HUP = libc::EPOLLHUP as u32;
-        const RDHUP = libc::EPOLLRDHUP as u32;
-        /* Input flags */
-        const ET = libc::EPOLLET as u32;
-        const ONESHOT = libc::EPOLLONESHOT as u32;
-        const WAKEUP = libc::EPOLLWAKEUP as u32;
-        const EXCLUSIVE = libc::EPOLLEXCLUSIVE as u32;
-    }
-}
 
 pub fn result_or_error<T: num::Integer>(res: T) -> std::io::Result<T> {
     if res >= num::zero() {
@@ -78,14 +59,14 @@ pub struct SystemImpl {
         this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32>,
     pub pollfd_mod: fn(
         this: &SystemImpl,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32>,
     pub pollfd_del: fn(this: &SystemImpl, pfd: RawFd, fd: RawFd) -> std::io::Result<i32>,
@@ -158,7 +139,7 @@ impl SystemImpl {
         &self,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32> {
         (self.pollfd_add)(self, pfd, fd, events, data)
@@ -168,7 +149,7 @@ impl SystemImpl {
         &self,
         pfd: RawFd,
         fd: RawFd,
-        events: PollEvents,
+        events: flags::Io,
         data: u64,
     ) -> std::io::Result<i32> {
         (self.pollfd_mod)(self, pfd, fd, events, data)

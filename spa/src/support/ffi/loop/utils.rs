@@ -10,9 +10,9 @@ use std::{
     pin::Pin,
 };
 
-use crate::interface::ffi::CSource;
 use crate::interface::r#loop::*;
 use crate::interface::{self, ffi::CInterface};
+use crate::{flags, interface::ffi::CSource};
 
 use crate::support::ffi::c_string;
 
@@ -116,7 +116,7 @@ impl CLoopUtilsImpl {
     fn add_io(
         this: &LoopUtilsImpl,
         fd: RawFd,
-        mask: SpaIo,
+        mask: flags::Io,
         close: bool,
         func: Box<SourceIoFn>,
     ) -> Option<Pin<Box<LoopUtilsSource>>> {
@@ -150,7 +150,7 @@ impl CLoopUtilsImpl {
     fn update_io(
         this: &LoopUtilsImpl,
         source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: SpaIo,
+        mask: flags::Io,
     ) -> std::io::Result<i32> {
         let loop_utils = Self::from_loop_utils(this);
         let funcs = loop_utils.iface.cb.funcs as *const CLoopUtilsMethods;
@@ -399,7 +399,7 @@ impl LoopUtilsCIface {
         let iface = Self::c_to_loop_utils_impl(object);
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
 
-        let Some(io_mask) = SpaIo::from_bits(mask) else {
+        let Some(io_mask) = flags::Io::from_bits(mask) else {
             return std::ptr::null_mut();
         };
 
@@ -424,7 +424,7 @@ impl LoopUtilsCIface {
         let loop_utils = unsafe { iface.loop_utils.as_ref().unwrap() };
         let source = iface.sources.get_mut(&c_source).unwrap();
 
-        let Some(io_mask) = SpaIo::from_bits(mask) else {
+        let Some(io_mask) = flags::Io::from_bits(mask) else {
             return -1;
         };
 
