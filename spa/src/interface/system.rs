@@ -14,16 +14,6 @@ pub struct PollEvent {
     pub data: u64,
 }
 
-/* TODO: consolidate like SPA_FD_* */
-pub const POLLFD_CLOEXEC: i32 = libc::EPOLL_CLOEXEC;
-pub const TIMERFD_CLOEXEC: i32 = libc::TFD_CLOEXEC;
-pub const TIMERFD_NONBLOCK: i32 = libc::TFD_NONBLOCK;
-pub const EVENTFD_CLOEXEC: i32 = libc::EFD_CLOEXEC;
-pub const EVENTFD_NONBLOCK: i32 = libc::EFD_NONBLOCK;
-pub const EVENTFD_SEMAPHORE: i32 = libc::EFD_SEMAPHORE;
-pub const SIGNALFD_CLOEXEC: i32 = libc::SFD_CLOEXEC;
-pub const SIGNALFD_NONBLOCK: i32 = libc::SFD_NONBLOCK;
-
 pub fn result_or_error<T: num::Integer>(res: T) -> std::io::Result<T> {
     if res >= num::zero() {
         Ok(res)
@@ -54,7 +44,7 @@ pub struct SystemImpl {
     ) -> std::io::Result<i32>,
 
     /* poll */
-    pub pollfd_create: fn(this: &SystemImpl, flags: i32) -> std::io::Result<i32>,
+    pub pollfd_create: fn(this: &SystemImpl, flags: flags::Fd) -> std::io::Result<i32>,
     pub pollfd_add: fn(
         this: &SystemImpl,
         pfd: RawFd,
@@ -78,11 +68,12 @@ pub struct SystemImpl {
     ) -> std::io::Result<i32>,
 
     /* timers */
-    pub timerfd_create: fn(this: &SystemImpl, clockid: i32, flags: i32) -> std::io::Result<i32>,
+    pub timerfd_create:
+        fn(this: &SystemImpl, clockid: i32, flags: flags::Fd) -> std::io::Result<i32>,
     pub timerfd_settime: fn(
         this: &SystemImpl,
         fd: RawFd,
-        flags: i32,
+        flags: flags::Fd,
         new_value: &libc::itimerspec,
         old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32>,
@@ -91,12 +82,13 @@ pub struct SystemImpl {
     pub timerfd_read: fn(this: &SystemImpl, fd: RawFd) -> std::io::Result<u64>,
 
     /* events */
-    pub eventfd_create: fn(this: &SystemImpl, flags: i32) -> std::io::Result<i32>,
+    pub eventfd_create: fn(this: &SystemImpl, flags: flags::Fd) -> std::io::Result<i32>,
     pub eventfd_write: fn(this: &SystemImpl, fd: RawFd, count: u64) -> std::io::Result<i32>,
     pub eventfd_read: fn(this: &SystemImpl, fd: RawFd) -> std::io::Result<u64>,
 
     /* signals */
-    pub signalfd_create: fn(this: &SystemImpl, signal: u32, flags: i32) -> std::io::Result<i32>,
+    pub signalfd_create:
+        fn(this: &SystemImpl, signal: u32, flags: flags::Fd) -> std::io::Result<i32>,
     pub signalfd_read: fn(this: &SystemImpl, fd: RawFd) -> std::io::Result<u32>,
 }
 
@@ -131,7 +123,7 @@ impl SystemImpl {
         (self.clock_getres)(self, clockid, res)
     }
 
-    pub fn pollfd_create(&self, flags: i32) -> std::io::Result<i32> {
+    pub fn pollfd_create(&self, flags: flags::Fd) -> std::io::Result<i32> {
         (self.pollfd_create)(self, flags)
     }
 
@@ -168,14 +160,14 @@ impl SystemImpl {
         (self.pollfd_wait)(self, pfd, events, timeout)
     }
 
-    pub fn timerfd_create(&self, clockid: i32, flags: i32) -> std::io::Result<i32> {
+    pub fn timerfd_create(&self, clockid: i32, flags: flags::Fd) -> std::io::Result<i32> {
         (self.timerfd_create)(self, clockid, flags)
     }
 
     pub fn timerfd_settime(
         &self,
         fd: RawFd,
-        flags: i32,
+        flags: flags::Fd,
         new_value: &libc::itimerspec,
         old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32> {
@@ -194,7 +186,7 @@ impl SystemImpl {
         (self.timerfd_read)(self, fd)
     }
 
-    pub fn eventfd_create(&self, flags: i32) -> std::io::Result<i32> {
+    pub fn eventfd_create(&self, flags: flags::Fd) -> std::io::Result<i32> {
         (self.eventfd_create)(self, flags)
     }
 
@@ -206,7 +198,7 @@ impl SystemImpl {
         (self.eventfd_read)(self, fd)
     }
 
-    pub fn signalfd_create(&self, signal: u32, flags: i32) -> std::io::Result<i32> {
+    pub fn signalfd_create(&self, signal: u32, flags: flags::Fd) -> std::io::Result<i32> {
         (self.signalfd_create)(self, signal, flags)
     }
 

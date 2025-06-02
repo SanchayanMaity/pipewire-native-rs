@@ -9,12 +9,9 @@ use std::os::fd::RawFd;
 use std::pin::Pin;
 
 use crate::interface::plugin::HandleFactory;
+use crate::interface::r#loop::{self, InvokeFn, Source};
 use crate::interface::r#loop::{LoopImpl, SourceFn};
 use crate::interface::system::SystemImpl;
-use crate::interface::{
-    r#loop::{self, InvokeFn, Source},
-    system::{self},
-};
 use crate::{flags, interface};
 
 pub struct Loop {
@@ -32,7 +29,7 @@ impl Loop {
             .get_interface(interface::SYSTEM)
             .unwrap();
         let system = system_iface.downcast_box::<SystemImpl>().unwrap();
-        let pollfd = system.pollfd_create(system::POLLFD_CLOEXEC)?;
+        let pollfd = system.pollfd_create(flags::Fd::CLOEXEC)?;
 
         Ok(LoopImpl {
             inner: Box::pin(Self {

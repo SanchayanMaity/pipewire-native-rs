@@ -202,12 +202,15 @@ impl CSystemImpl {
         }
     }
 
-    fn pollfd_create(this: &SystemImpl, flags: i32) -> std::io::Result<i32> {
+    fn pollfd_create(this: &SystemImpl, flags: flags::Fd) -> std::io::Result<i32> {
         unsafe {
             let system = Self::from_system(this);
             let funcs = system.iface.cb.funcs as *const CSystemMethods;
 
-            result_or_error(((*funcs).pollfd_create)(system.iface.cb.data, flags))
+            result_or_error(((*funcs).pollfd_create)(
+                system.iface.cb.data,
+                flags.bits() as i32,
+            ))
         }
     }
 
@@ -285,7 +288,7 @@ impl CSystemImpl {
     fn timerfd_create(
         this: &SystemImpl,
         clockid: libc::clockid_t,
-        flags: i32,
+        flags: flags::Fd,
     ) -> std::io::Result<i32> {
         unsafe {
             let system = Self::from_system(this);
@@ -294,7 +297,7 @@ impl CSystemImpl {
             result_or_error(((*funcs).timerfd_create)(
                 system.iface.cb.data,
                 clockid,
-                flags,
+                flags.bits() as i32,
             ))
         }
     }
@@ -302,7 +305,7 @@ impl CSystemImpl {
     fn timerfd_settime(
         this: &SystemImpl,
         fd: RawFd,
-        flags: i32,
+        flags: flags::Fd,
         new_value: &libc::itimerspec,
         old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32> {
@@ -318,7 +321,7 @@ impl CSystemImpl {
             result_or_error(((*funcs).timerfd_settime)(
                 system.iface.cb.data,
                 fd,
-                flags,
+                flags.bits() as i32,
                 new_value,
                 old_value,
             ))
@@ -358,12 +361,15 @@ impl CSystemImpl {
         }
     }
 
-    fn eventfd_create(this: &SystemImpl, flags: i32) -> std::io::Result<i32> {
+    fn eventfd_create(this: &SystemImpl, flags: flags::Fd) -> std::io::Result<i32> {
         unsafe {
             let system = Self::from_system(this);
             let funcs = system.iface.cb.funcs as *const CSystemMethods;
 
-            result_or_error(((*funcs).eventfd_create)(system.iface.cb.data, flags))
+            result_or_error(((*funcs).eventfd_create)(
+                system.iface.cb.data,
+                flags.bits() as i32,
+            ))
         }
     }
 
@@ -398,7 +404,7 @@ impl CSystemImpl {
         }
     }
 
-    fn signalfd_create(this: &SystemImpl, signal: u32, flags: i32) -> std::io::Result<i32> {
+    fn signalfd_create(this: &SystemImpl, signal: u32, flags: flags::Fd) -> std::io::Result<i32> {
         unsafe {
             let system = Self::from_system(this);
             let funcs = system.iface.cb.funcs as *const CSystemMethods;
@@ -406,7 +412,7 @@ impl CSystemImpl {
             result_or_error(((*funcs).signalfd_create)(
                 system.iface.cb.data,
                 signal as c_int,
-                flags,
+                flags.bits() as i32,
             ))
         }
     }
@@ -553,7 +559,9 @@ impl SystemImplCIface {
     extern "C" fn pollfd_create(object: *mut c_void, flags: c_int) -> i32 {
         let system = Self::c_to_system_impl(object);
 
-        let res = system.pollfd_create(flags);
+        let res = flags::Fd::from_bits(flags as u32)
+            .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidData))
+            .and_then(|f| system.pollfd_create(f));
 
         res.unwrap_or(-1)
     }
@@ -615,7 +623,9 @@ impl SystemImplCIface {
     extern "C" fn timerfd_create(object: *mut c_void, clockid: c_int, flags: c_int) -> i32 {
         let system = Self::c_to_system_impl(object);
 
-        let res = system.timerfd_create(clockid, flags);
+        let res = flags::Fd::from_bits(flags as u32)
+            .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidData))
+            .and_then(|f| system.timerfd_create(clockid, f));
 
         res.unwrap_or(-1)
     }
@@ -635,7 +645,9 @@ impl SystemImplCIface {
             unsafe { Some(&mut *old_value) }
         };
 
-        let res = system.timerfd_settime(fd, flags, unsafe { &*new_value }, old_value);
+        let res = flags::Fd::from_bits(flags as u32)
+            .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidData))
+            .and_then(|f| system.timerfd_settime(fd, f, unsafe { &*new_value }, old_value));
 
         res.unwrap_or(-1)
     }
@@ -669,7 +681,9 @@ impl SystemImplCIface {
     extern "C" fn eventfd_create(object: *mut c_void, flags: c_int) -> i32 {
         let system = Self::c_to_system_impl(object);
 
-        let res = system.eventfd_create(flags);
+        let res = flags::Fd::from_bits(flags as u32)
+            .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidData))
+            .and_then(|f| system.eventfd_create(f));
 
         res.unwrap_or(-1)
     }
@@ -699,7 +713,9 @@ impl SystemImplCIface {
     extern "C" fn signalfd_create(object: *mut c_void, signal: c_int, flags: c_int) -> i32 {
         let system = Self::c_to_system_impl(object);
 
-        let res = system.signalfd_create(signal as u32, flags);
+        let res = flags::Fd::from_bits(flags as u32)
+            .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidData))
+            .and_then(|f| system.signalfd_create(signal as u32, f));
 
         res.unwrap_or(-1)
     }

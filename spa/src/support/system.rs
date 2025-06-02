@@ -59,8 +59,14 @@ impl System {
         result_or_error(res)
     }
 
-    fn pollfd_create(_this: &SystemImpl, flags: i32) -> std::io::Result<i32> {
-        let res = unsafe { libc::epoll_create1(flags) };
+    fn pollfd_create(_this: &SystemImpl, flags: flags::Fd) -> std::io::Result<i32> {
+        let mut f = 0;
+
+        if flags.contains(flags::Fd::CLOEXEC) {
+            f |= libc::EPOLL_CLOEXEC
+        };
+
+        let res = unsafe { libc::epoll_create1(f) };
         result_or_error(res)
     }
 
@@ -155,15 +161,24 @@ impl System {
         result_or_error(res)
     }
 
-    fn timerfd_create(_this: &SystemImpl, clockid: i32, flags: i32) -> std::io::Result<i32> {
-        let res = unsafe { libc::timerfd_create(clockid, flags) };
+    fn timerfd_create(_this: &SystemImpl, clockid: i32, flags: flags::Fd) -> std::io::Result<i32> {
+        let mut f = 0;
+
+        if flags.contains(flags::Fd::CLOEXEC) {
+            f |= libc::TFD_CLOEXEC
+        }
+        if flags.contains(flags::Fd::NONBLOCK) {
+            f |= libc::TFD_NONBLOCK
+        }
+
+        let res = unsafe { libc::timerfd_create(clockid, f) };
         result_or_error(res)
     }
 
     fn timerfd_settime(
         _this: &SystemImpl,
         fd: RawFd,
-        flags: i32,
+        flags: flags::Fd,
         new_value: &libc::itimerspec,
         old_value: Option<&mut libc::itimerspec>,
     ) -> std::io::Result<i32> {
@@ -171,8 +186,16 @@ impl System {
             Some(v) => v as *mut libc::itimerspec,
             None => std::ptr::null_mut(),
         };
+        let mut f = 0;
 
-        let res = unsafe { libc::timerfd_settime(fd, flags, new_value, old_value) };
+        if flags.contains(flags::Fd::TIMER_ABSTIME) {
+            f |= libc::TFD_TIMER_ABSTIME
+        }
+        if flags.contains(flags::Fd::TIMER_CANCEL_ON_SET) {
+            f |= libc::TFD_TIMER_CANCEL_ON_SET
+        }
+
+        let res = unsafe { libc::timerfd_settime(fd, f, new_value, old_value) };
         result_or_error(res)
     }
 
@@ -200,8 +223,20 @@ impl System {
         }
     }
 
-    pub fn eventfd_create(_this: &SystemImpl, flags: i32) -> std::io::Result<i32> {
-        let res = unsafe { libc::eventfd(0, flags) };
+    pub fn eventfd_create(_this: &SystemImpl, flags: flags::Fd) -> std::io::Result<i32> {
+        let mut f = 0;
+
+        if flags.contains(flags::Fd::CLOEXEC) {
+            f |= libc::EFD_CLOEXEC;
+        }
+        if flags.contains(flags::Fd::NONBLOCK) {
+            f |= libc::EFD_NONBLOCK;
+        }
+        if flags.contains(flags::Fd::EVENT_SEMAPHORE) {
+            f |= libc::EFD_SEMAPHORE;
+        }
+
+        let res = unsafe { libc::eventfd(0, f) };
         result_or_error(res)
     }
 
@@ -234,14 +269,26 @@ impl System {
         }
     }
 
-    pub fn signalfd_create(_this: &SystemImpl, signal: u32, flags: i32) -> std::io::Result<i32> {
+    pub fn signalfd_create(
+        _this: &SystemImpl,
+        signal: u32,
+        flags: flags::Fd,
+    ) -> std::io::Result<i32> {
         let res = unsafe {
             let mut mask: libc::sigset_t = std::mem::zeroed();
+            let mut f = 0;
+
+            if flags.contains(flags::Fd::CLOEXEC) {
+                f |= libc::SFD_CLOEXEC;
+            }
+            if flags.contains(flags::Fd::NONBLOCK) {
+                f |= libc::SFD_NONBLOCK;
+            }
 
             libc::sigemptyset(&mut mask);
             libc::sigaddset(&mut mask, signal as i32);
 
-            libc::signalfd(-1, &mask, flags)
+            libc::signalfd(-1, &mask, f)
         };
         result_or_error(res)
     }
