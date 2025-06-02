@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::Arc;
 
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::plugin::HandleFactory;
@@ -25,15 +26,12 @@ fn test_thread() {
         .downcast_box::<ThreadUtilsImpl>()
         .expect("Iface implementation should be a thread utils impl");
 
-    let accum = Arc::new(Mutex::new(0i32));
-
+    let accum = Arc::new(AtomicI32::new(0));
     let accum_thr = accum.clone();
 
     let thread = thread_utils
         .create(None, move || {
-            let mut a = accum_thr.lock().unwrap();
-
-            *a += 1;
+            accum_thr.fetch_add(1, Ordering::SeqCst);
 
             Box::new(true)
         })
@@ -45,6 +43,6 @@ fn test_thread() {
         .downcast::<bool>()
         .expect("Return value should be a bool");
 
-    assert_eq!(*accum.lock().unwrap(), 1);
+    assert_eq!(accum.load(Ordering::SeqCst), 1);
     assert_eq!(*retval, true);
 }
