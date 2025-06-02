@@ -5,7 +5,7 @@
 use std::sync::{Arc, Mutex};
 
 use pipewire_native_spa::interface;
-use pipewire_native_spa::interface::plugin::{Handle, HandleFactory};
+use pipewire_native_spa::interface::plugin::HandleFactory;
 use pipewire_native_spa::interface::thread::ThreadUtilsImpl;
 use pipewire_native_spa::support::plugin;
 
