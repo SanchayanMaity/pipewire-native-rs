@@ -22,6 +22,13 @@ struct CControlMethodsMethods {
     leave: extern "C" fn(object: *mut c_void),
     iterate: extern "C" fn(object: *mut c_void, timeout: c_int) -> c_int,
     check: extern "C" fn(object: *mut c_void) -> c_int,
+    lock: extern "C" fn(object: *mut c_void) -> c_int,
+    unlock: extern "C" fn(object: *mut c_void) -> c_int,
+    get_time:
+        extern "C" fn(object: *mut c_void, abstime: *mut libc::timespec, timeout: i64) -> c_int,
+    wait: extern "C" fn(object: *mut c_void, abstime: *const libc::timespec) -> c_int,
+    signal: extern "C" fn(object: *mut c_void, wait_for_accept: bool) -> c_int,
+    accept: extern "C" fn(object: *mut c_void) -> c_int,
 }
 
 #[repr(C)]
@@ -41,6 +48,12 @@ pub fn new_impl(interface: *mut CInterface) -> LoopControlMethodsImpl {
         leave: CLoopControlMethodsImpl::leave,
         iterate: CLoopControlMethodsImpl::iterate,
         check: CLoopControlMethodsImpl::check,
+        lock: CLoopControlMethodsImpl::lock,
+        unlock: CLoopControlMethodsImpl::unlock,
+        get_time: CLoopControlMethodsImpl::get_time,
+        wait: CLoopControlMethodsImpl::wait,
+        signal: CLoopControlMethodsImpl::signal,
+        accept: CLoopControlMethodsImpl::accept,
     }
 }
 
@@ -112,10 +125,71 @@ impl CLoopControlMethodsImpl {
 
         unsafe { ((*funcs).check)(control_impl.iface.cb.data) }
     }
+
+    fn lock(this: &LoopControlMethodsImpl) -> i32 {
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+
+        unsafe { ((*funcs).lock)(control_impl.iface.cb.data) }
+    }
+
+    fn unlock(this: &LoopControlMethodsImpl) -> i32 {
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+
+        unsafe { ((*funcs).lock)(control_impl.iface.cb.data) }
+    }
+
+    fn get_time(
+        this: &LoopControlMethodsImpl,
+        timeout: Duration,
+    ) -> std::io::Result<libc::timespec> {
+        let mut abstime = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+
+        let res = unsafe {
+            ((*funcs).get_time)(
+                control_impl.iface.cb.data,
+                &mut abstime as *mut libc::timespec,
+                timeout.as_nanos() as i64,
+            )
+        };
+
+        match res {
+            0 => Ok(abstime),
+            e => Err(std::io::Error::from_raw_os_error(-e)),
+        }
+    }
+
+    fn wait(this: &LoopControlMethodsImpl, abstime: &libc::timespec) -> i32 {
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+
+        unsafe { ((*funcs).wait)(control_impl.iface.cb.data, abstime as *const libc::timespec) }
+    }
+
+    fn signal(this: &LoopControlMethodsImpl, wait_for_accept: bool) -> i32 {
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+
+        unsafe { ((*funcs).signal)(control_impl.iface.cb.data, wait_for_accept) }
+    }
+
+    fn accept(this: &LoopControlMethodsImpl) -> i32 {
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+
+        unsafe { ((*funcs).accept)(control_impl.iface.cb.data) }
+    }
 }
 
 static LOOP_CONTROL_METHODS: CControlMethodsMethods = CControlMethodsMethods {
-    version: 1,
+    version: 2,
 
     get_fd: ControlMethodsIface::get_fd,
     add_hook: ControlMethodsIface::add_hook,
@@ -123,6 +197,12 @@ static LOOP_CONTROL_METHODS: CControlMethodsMethods = CControlMethodsMethods {
     leave: ControlMethodsIface::leave,
     iterate: ControlMethodsIface::iterate,
     check: ControlMethodsIface::check,
+    lock: ControlMethodsIface::lock,
+    unlock: ControlMethodsIface::unlock,
+    get_time: ControlMethodsIface::get_time,
+    wait: ControlMethodsIface::wait,
+    signal: ControlMethodsIface::signal,
+    accept: ControlMethodsIface::accept,
 };
 
 struct ControlMethodsIface {}
@@ -179,6 +259,54 @@ impl ControlMethodsIface {
         let control_methods_impl = Self::c_to_control_methods_impl(object);
 
         control_methods_impl.check()
+    }
+
+    extern "C" fn lock(object: *mut c_void) -> c_int {
+        let control_methods_impl = Self::c_to_control_methods_impl(object);
+
+        control_methods_impl.lock()
+    }
+
+    extern "C" fn unlock(object: *mut c_void) -> c_int {
+        let control_methods_impl = Self::c_to_control_methods_impl(object);
+
+        control_methods_impl.unlock()
+    }
+
+    extern "C" fn get_time(
+        object: *mut c_void,
+        abstime: *mut libc::timespec,
+        timeout: i64,
+    ) -> c_int {
+        let control_methods_impl = Self::c_to_control_methods_impl(object);
+
+        match control_methods_impl.get_time(Duration::from_nanos(timeout as u64)) {
+            Ok(time) => {
+                unsafe {
+                    *abstime = time;
+                };
+                0
+            }
+            Err(e) => e.raw_os_error().unwrap(),
+        }
+    }
+
+    extern "C" fn wait(object: *mut c_void, abstime: *const libc::timespec) -> c_int {
+        let control_methods_impl = Self::c_to_control_methods_impl(object);
+
+        control_methods_impl.wait(unsafe { abstime.as_ref().unwrap() })
+    }
+
+    extern "C" fn signal(object: *mut c_void, wait_for_accept: bool) -> c_int {
+        let control_methods_impl = Self::c_to_control_methods_impl(object);
+
+        control_methods_impl.signal(wait_for_accept)
+    }
+
+    extern "C" fn accept(object: *mut c_void) -> c_int {
+        let control_methods_impl = Self::c_to_control_methods_impl(object);
+
+        control_methods_impl.accept()
     }
 }
 

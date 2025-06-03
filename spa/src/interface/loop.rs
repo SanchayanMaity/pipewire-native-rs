@@ -78,6 +78,12 @@ pub struct LoopControlMethodsImpl {
     pub leave: fn(&LoopControlMethodsImpl),
     pub iterate: fn(&LoopControlMethodsImpl, timeout: Option<Duration>) -> i32,
     pub check: fn(&LoopControlMethodsImpl) -> i32,
+    pub lock: fn(&LoopControlMethodsImpl) -> i32,
+    pub unlock: fn(&LoopControlMethodsImpl) -> i32,
+    pub get_time: fn(&LoopControlMethodsImpl, timeout: Duration) -> std::io::Result<libc::timespec>,
+    pub wait: fn(&LoopControlMethodsImpl, abstime: &libc::timespec) -> i32,
+    pub signal: fn(&LoopControlMethodsImpl, wait_for_accept: bool) -> i32,
+    pub accept: fn(&LoopControlMethodsImpl) -> i32,
 }
 
 impl LoopControlMethodsImpl {
@@ -103,6 +109,30 @@ impl LoopControlMethodsImpl {
 
     pub fn check(&self) -> i32 {
         (self.check)(self)
+    }
+
+    pub fn lock(&self) -> i32 {
+        (self.lock)(self)
+    }
+
+    pub fn unlock(&self) -> i32 {
+        (self.unlock)(self)
+    }
+
+    pub fn get_time(&self, timeout: Duration) -> std::io::Result<libc::timespec> {
+        (self.get_time)(self, timeout)
+    }
+
+    pub fn wait(&self, abstime: &libc::timespec) -> i32 {
+        (self.wait)(self, abstime)
+    }
+
+    pub fn signal(&self, wait_for_accept: bool) -> i32 {
+        (self.signal)(self, wait_for_accept)
+    }
+
+    pub fn accept(&self) -> i32 {
+        (self.accept)(self)
     }
 }
 
