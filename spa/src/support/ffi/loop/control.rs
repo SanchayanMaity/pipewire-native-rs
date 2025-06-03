@@ -57,68 +57,60 @@ impl CLoopControlMethodsImpl {
     }
 
     fn get_fd(this: &LoopControlMethodsImpl) -> u32 {
-        unsafe {
-            let control_impl = Self::from_control_methods(this);
-            let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-            ((*funcs).get_fd)(control_impl.iface.cb.data)
-        }
+        unsafe { ((*funcs).get_fd)(control_impl.iface.cb.data) }
     }
 
     fn add_hook(this: &LoopControlMethodsImpl, hook: &CHook, hooks: &CControlHooks, data: u64) {
-        unsafe {
-            let control_impl = Self::from_control_methods(this);
-            let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
+        unsafe {
             ((*funcs).add_hook)(control_impl.iface.cb.data, hook, hooks, data as *mut c_void);
         }
     }
 
     fn enter(this: &LoopControlMethodsImpl) {
-        unsafe {
-            let control_impl = Self::from_control_methods(this);
-            let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-            ((*funcs).enter)(control_impl.iface.cb.data)
-        }
+        unsafe { ((*funcs).enter)(control_impl.iface.cb.data) }
     }
 
     fn leave(this: &LoopControlMethodsImpl) {
-        unsafe {
-            let control_impl = Self::from_control_methods(this);
-            let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
+        unsafe {
             ((*funcs).leave)(control_impl.iface.cb.data);
         }
     }
 
     fn iterate(this: &LoopControlMethodsImpl, timeout: Option<Duration>) -> i32 {
-        unsafe {
-            let control_impl = Self::from_control_methods(this);
-            let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-            let timeout: i32 = match timeout {
-                Some(t) => {
-                    if t == Duration::MAX {
-                        -1
-                    } else {
-                        t.as_millis() as i32
-                    }
+        let timeout: i32 = match timeout {
+            Some(t) => {
+                if t == Duration::MAX {
+                    -1
+                } else {
+                    t.as_millis() as i32
                 }
-                None => 0,
-            };
+            }
+            None => 0,
+        };
 
-            ((*funcs).iterate)(control_impl.iface.cb.data, timeout)
-        }
+        unsafe { ((*funcs).iterate)(control_impl.iface.cb.data, timeout) }
     }
 
     fn check(this: &LoopControlMethodsImpl) -> i32 {
-        unsafe {
-            let control_impl = Self::from_control_methods(this);
-            let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
+        let control_impl = Self::from_control_methods(this);
+        let funcs = control_impl.iface.cb.funcs as *const CControlMethodsMethods;
 
-            ((*funcs).check)(control_impl.iface.cb.data)
-        }
+        unsafe { ((*funcs).check)(control_impl.iface.cb.data) }
     }
 }
 
