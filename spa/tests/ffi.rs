@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
+use std::io::{pipe, Write};
+use std::os::fd::{AsRawFd, RawFd};
 use std::path::PathBuf;
 
 use pipewire_native_spa::dict::Dict;
+use pipewire_native_spa::flags;
 use pipewire_native_spa::interface;
 use pipewire_native_spa::interface::cpu::CpuImpl;
 use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
@@ -227,6 +230,18 @@ fn test_loop_support() {
         let fd = ctrl.get_fd();
         assert!(fd != 0);
 
+        let (reader, mut writer) = pipe().unwrap();
+        let rx_fd = reader.as_raw_fd();
+
+        let io_src = utils.add_io(rx_fd, flags::Io::IN, false, Box::new(io_callback));
+        assert!(io_src.is_some());
+        let mut io_src = io_src.unwrap();
+
+        let res = utils.update_io(&mut io_src, flags::Io::IN);
+        assert!(res.is_ok());
+
+        writer.write("Hello".as_bytes()).unwrap();
+
         let event_src = utils.add_event(Box::new(event_callback));
         assert!(event_src.is_some());
         let mut event_src = event_src.unwrap();
@@ -256,20 +271,26 @@ fn test_loop_support() {
         assert_eq!(ctrl.check(), 1);
         let methods_dispatched = ctrl.iterate(Some(LOOP_TIMEOUT));
         /*
-         * Three methods should have been dispatched as per above
+         * Four methods should have been dispatched as per above
+         * - IO
          * - Signal
          * - Timer
          * - Idle
          */
-        assert_eq!(methods_dispatched, 3);
+        assert_eq!(methods_dispatched, 4);
         ctrl.leave();
 
+        utils.destroy_source(io_src);
         utils.destroy_source(event_src);
         utils.destroy_source(timer_src);
         utils.destroy_source(idle_src);
     } else {
         panic!("Failed to get loop control or utils");
     }
+}
+
+fn io_callback(fd: RawFd, mask: u32) {
+    println!("IO callback, fd: {fd} mask: {mask}");
 }
 
 fn idle_callback() {
