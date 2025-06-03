@@ -123,7 +123,7 @@ impl CLoopControlMethodsImpl {
 }
 
 static LOOP_CONTROL_METHODS: CControlMethodsMethods = CControlMethodsMethods {
-    version: 0,
+    version: 1,
 
     get_fd: ControlMethodsIface::get_fd,
     add_hook: ControlMethodsIface::add_hook,
