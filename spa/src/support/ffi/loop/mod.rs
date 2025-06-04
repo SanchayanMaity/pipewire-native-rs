@@ -37,7 +37,7 @@ struct CLoopMethods {
     update_source: extern "C" fn(object: *mut c_void, source: *mut CSource) -> c_int,
     remove_source: extern "C" fn(object: *mut c_void, source: *mut CSource) -> c_int,
     invoke: extern "C" fn(
-        object: *mut c_void,
+        object: *const c_void,
         func: CInvokeFunc,
         seq: u32,
         data: *const c_void,
@@ -199,7 +199,7 @@ impl CLoopImpl {
     }
 
     fn invoke(
-        loop_: &mut LoopImpl,
+        loop_: &LoopImpl,
         seq: u32,
         data: &[u8],
         block: bool,
@@ -260,6 +260,10 @@ impl LoopImplIface {
         unsafe { (object as *mut LoopImpl).as_mut().unwrap() }
     }
 
+    fn c_to_const_loop_impl(object: *const c_void) -> &'static LoopImpl {
+        unsafe { (object as *const LoopImpl).as_ref().unwrap() }
+    }
+
     extern "C" fn add_source(object: *mut c_void, source: *mut CSource) -> c_int {
         let loop_impl = Self::c_to_loop_impl(object);
         let c_source = unsafe { source.as_mut().unwrap() };
@@ -307,7 +311,7 @@ impl LoopImplIface {
     }
 
     extern "C" fn invoke(
-        object: *mut c_void,
+        object: *const c_void,
         func: CInvokeFunc,
         seq: u32,
         data: *const c_void,
@@ -315,7 +319,7 @@ impl LoopImplIface {
         block: bool,
         user_data: *mut c_void,
     ) -> c_int {
-        let loop_impl = Self::c_to_loop_impl(object);
+        let loop_impl = Self::c_to_const_loop_impl(object);
 
         let res = loop_impl.invoke(
             seq,
