@@ -14,9 +14,18 @@ use pipewire_native_spa::interface::log::{LogImpl, LogLevel};
 use pipewire_native_spa::interface::r#loop::{LoopControlMethodsImpl, LoopImpl, LoopUtilsImpl};
 use pipewire_native_spa::interface::system::SystemImpl;
 use pipewire_native_spa::support::ffi;
+
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
+const IO_CB: &str = "IO";
+const EVENT_CB: &str = "EVENT";
+const TIMER_CB: &str = "TIMER";
+const IDLE_CB: &str = "IDLE";
 const LOOP_TIMEOUT: Duration = Duration::from_secs(5);
+
+static CALLBACKS: LazyLock<Mutex<HashMap<String, bool>>> = LazyLock::new(|| HashMap::new().into());
 
 fn init_support() -> (interface::Support, ffi::plugin::Plugin) {
     let plugin_path = std::env::var("SPA_TEST_PLUGIN_PATH")
@@ -280,6 +289,13 @@ fn test_loop_support() {
         assert_eq!(methods_dispatched, 4);
         ctrl.leave();
 
+        // Validate that our callbacks were called
+        let cb = CALLBACKS.lock().unwrap();
+        assert_eq!(cb.get(IO_CB).unwrap(), &true);
+        assert_eq!(cb.get(EVENT_CB).unwrap(), &true);
+        assert_eq!(cb.get(TIMER_CB).unwrap(), &true);
+        assert_eq!(cb.get(IDLE_CB).unwrap(), &true);
+
         utils.destroy_source(io_src);
         utils.destroy_source(event_src);
         utils.destroy_source(timer_src);
@@ -289,18 +305,21 @@ fn test_loop_support() {
     }
 }
 
-fn io_callback(fd: RawFd, mask: u32) {
-    println!("IO callback, fd: {fd} mask: {mask}");
+fn io_callback(_fd: RawFd, mask: u32) {
+    assert_eq!(mask, flags::Io::IN.bits());
+    CALLBACKS.lock().unwrap().insert(IO_CB.to_string(), true);
 }
 
 fn idle_callback() {
-    println!("Idle callback");
+    CALLBACKS.lock().unwrap().insert(IDLE_CB.to_string(), true);
 }
 
 fn event_callback(count: u64) {
-    println!("Event callback, count: {count}");
+    assert_eq!(count, 1);
+    CALLBACKS.lock().unwrap().insert(EVENT_CB.to_string(), true);
 }
 
 fn timer_callback(expirations: u64) {
-    println!("Timer callback, expirations: {expirations}");
+    assert_eq!(expirations, 1);
+    CALLBACKS.lock().unwrap().insert(TIMER_CB.to_string(), true);
 }
