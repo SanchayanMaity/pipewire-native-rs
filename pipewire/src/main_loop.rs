@@ -97,7 +97,9 @@ impl MainLoop {
 
     pub fn quit(&mut self) {
         self.running.store(false, Ordering::Relaxed);
-        self.inner.quit();
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.quit();
+        }
     }
 
     // TODO: Should this just move to Drop?
@@ -206,9 +208,11 @@ impl InnerMainLoop {
         self.pw_loop.control.leave();
     }
 
-    fn quit(&self) {
-        // let stop = move |_block: bool, _seq: u32, _data: &[u8]| 0;
-        // let _ = self.pw_loop.r#loop.invoke(1, &[], false, Box::new(stop));
+    fn quit(&mut self) {
+        if let Some(l) = Arc::get_mut(&mut self.pw_loop.r#loop) {
+            let stop = move |_block: bool, _seq: u32, _data: &[u8]| 0;
+            let _ = l.invoke(1, &[], false, Box::new(stop));
+        }
     }
 
     // Loop control methods
