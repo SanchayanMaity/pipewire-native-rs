@@ -36,6 +36,14 @@ pub struct MainLoopEvents {
     destroy: Box<dyn FnMut()>,
 }
 
+impl MainLoopEvents {
+    pub fn new(destroy_cb: Box<dyn FnMut()>) -> Self {
+        Self {
+            destroy: destroy_cb,
+        }
+    }
+}
+
 unsafe impl Send for MainLoopEvents {}
 unsafe impl Sync for MainLoopEvents {}
 
