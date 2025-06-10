@@ -113,10 +113,13 @@ fn test_mainloop(exec: MainLoopRun) {
 }
 
 #[test]
-fn test_main_loop() {
-    // FIXME: Crashes if both are enabled?
+fn test_main_loop_iterate() {
+    test_mainloop(MainLoopRun::Iterate);
+}
+
+#[test]
+fn test_main_loop_run() {
     test_mainloop(MainLoopRun::Run);
-    // test_mainloop(MainLoopExec::Iterate);
 }
 
 fn io_callback(_fd: RawFd, mask: u32) {
