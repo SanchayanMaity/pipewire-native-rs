@@ -179,7 +179,7 @@ impl InnerMainLoop {
         })
     }
 
-     fn destroy(self) {
+    fn destroy(self) {
         emit_hook!(self.hooks, destroy,);
     }
 
