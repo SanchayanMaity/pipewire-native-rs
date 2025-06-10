@@ -8,3 +8,6 @@ libc = "0.2.172"
 pipewire-native-macros = { path = "../macros" }
 pipewire-native-spa = { path = "../spa" }
 tinyjson = "2.5.1"
+
+[dev-dependencies]
+serial_test = "3"

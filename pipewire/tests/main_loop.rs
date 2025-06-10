@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
 
-use pipewire_native::main_loop::MainLoop;
+use pipewire_native::main_loop::{MainLoop, MainLoopEvents};
 use pipewire_native_spa::dict::Dict;
 use pipewire_native_spa::flags;
 
+use serial_test::serial;
 use std::collections::HashMap;
 use std::io::{pipe, Write};
 use std::os::fd::{AsRawFd, RawFd};
@@ -16,6 +17,7 @@ const IO_CB: &str = "IO";
 const EVENT_CB: &str = "EVENT";
 const TIMER_CB: &str = "TIMER";
 const IDLE_CB: &str = "IDLE";
+const LISTENER_CB: &str = "LISTENER";
 const LOOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 static CALLBACKS: LazyLock<Mutex<HashMap<String, bool>>> = LazyLock::new(|| HashMap::new().into());
@@ -70,6 +72,9 @@ fn test_mainloop(exec: MainLoopRun) {
     let res = ml.enable_idle(&mut idle_src, true);
     assert!(res.is_ok());
 
+    let mle = MainLoopEvents::new(Box::new(listener_callback));
+    ml.add_listener(mle);
+
     match exec {
         MainLoopRun::Run => {
             let (ml_weak, running) = ml.downgrade();
@@ -103,23 +108,38 @@ fn test_mainloop(exec: MainLoopRun) {
     assert_eq!(cb.get(EVENT_CB).unwrap(), &true);
     assert_eq!(cb.get(TIMER_CB).unwrap(), &true);
     assert_eq!(cb.get(IDLE_CB).unwrap(), &true);
+    assert_eq!(cb.get(LISTENER_CB), None);
+    drop(cb);
 
     ml.destroy_source(io_src);
     ml.destroy_source(event_src);
     ml.destroy_source(timer_src);
     ml.destroy_source(idle_src);
 
-    ml.destroy()
+    ml.destroy();
+
+    let mut cb = CALLBACKS.lock().unwrap();
+    assert_eq!(cb.get(LISTENER_CB).unwrap(), &true);
+    cb.clear();
 }
 
 #[test]
+#[serial]
 fn test_main_loop_iterate() {
     test_mainloop(MainLoopRun::Iterate);
 }
 
 #[test]
+#[serial]
 fn test_main_loop_run() {
     test_mainloop(MainLoopRun::Run);
+}
+
+fn listener_callback() {
+    CALLBACKS
+        .lock()
+        .unwrap()
+        .insert(LISTENER_CB.to_string(), true);
 }
 
 fn io_callback(_fd: RawFd, mask: u32) {
