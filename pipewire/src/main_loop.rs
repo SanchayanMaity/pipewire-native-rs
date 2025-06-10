@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc, Mutex, OnceLock, Weak,
+    Arc, Mutex, Weak,
 };
 
 #[allow(dead_code)]
@@ -31,8 +31,6 @@ struct Handles {
     support: interface::Support,
     plugin: ffi::plugin::Plugin,
 }
-
-static HANDLES: OnceLock<Mutex<Handles>> = OnceLock::new();
 
 pub struct MainLoopEvents {
     destroy: Box<dyn FnMut()>,
@@ -112,6 +110,7 @@ impl MainLoop {
 #[derive(Clone)]
 pub struct InnerMainLoop {
     pw_loop: Loop,
+    handles: Arc<Handles>,
     hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
 }
 
@@ -165,10 +164,6 @@ impl InnerMainLoop {
             plugin,
         };
 
-        if let Err(_) = HANDLES.set(Mutex::new(handles)) {
-            return None;
-        }
-
         Some(InnerMainLoop {
             pw_loop: Loop {
                 system,
@@ -177,6 +172,7 @@ impl InnerMainLoop {
                 utils: lutils,
                 name,
             },
+            handles: Arc::new(handles),
             hooks: HookList::new(),
         })
     }
