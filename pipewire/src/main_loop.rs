@@ -13,7 +13,6 @@ use spa::interface::system::SystemImpl;
 use spa::support::ffi;
 use spa::{emit_hook, hook::HookList};
 
-use std::ops::Deref;
 use std::os::fd::RawFd;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -61,15 +60,8 @@ pub struct MainLoop {
     inner: Arc<InnerMainLoop>,
     running: Arc<AtomicBool>,
 }
+
 pub struct WeakMainLoop(Weak<InnerMainLoop>);
-
-impl Deref for MainLoop {
-    type Target = InnerMainLoop;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner.as_ref()
-    }
-}
 
 impl WeakMainLoop {
     pub fn upgrade(&self, running: Arc<AtomicBool>) -> Option<MainLoop> {
@@ -108,6 +100,136 @@ impl MainLoop {
         }
     }
 
+    pub fn add_listener(&self, events: MainLoopEvents) {
+        self.inner.hooks.lock().unwrap().append(events);
+    }
+
+    // Loop control methods
+    pub fn get_fd(&self) -> u32 {
+        self.inner.pw_loop.control.get_fd()
+    }
+
+    pub fn add_hook(&self, hook: &CHook, hooks: &CControlHooks, data: u64) {
+        self.inner.pw_loop.control.add_hook(hook, hooks, data)
+    }
+
+    pub fn enter(&self) {
+        self.inner.pw_loop.control.enter()
+    }
+
+    pub fn leave(&self) {
+        self.inner.pw_loop.control.leave()
+    }
+
+    pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<i32> {
+        self.inner.pw_loop.control.iterate(timeout)
+    }
+
+    pub fn check(&self) -> std::io::Result<i32> {
+        self.inner.pw_loop.control.check()
+    }
+
+    pub fn lock(&self) -> std::io::Result<i32> {
+        self.inner.pw_loop.control.lock()
+    }
+
+    pub fn unlock(&self) -> std::io::Result<i32> {
+        self.inner.pw_loop.control.unlock()
+    }
+
+    pub fn get_time(&self, timeout: std::time::Duration) -> std::io::Result<libc::timespec> {
+        self.inner.pw_loop.control.get_time(timeout)
+    }
+
+    pub fn wait(&self, abstime: &libc::timespec) -> std::io::Result<i32> {
+        self.inner.pw_loop.control.wait(abstime)
+    }
+
+    pub fn signal(&self, wait_for_accept: bool) -> std::io::Result<i32> {
+        self.inner.pw_loop.control.signal(wait_for_accept)
+    }
+
+    pub fn accept(&self) -> std::io::Result<i32> {
+        self.inner.pw_loop.control.accept()
+    }
+
+    // Loop utils
+    pub fn add_io(
+        &self,
+        fd: RawFd,
+        mask: flags::Io,
+        close: bool,
+        func: Box<SourceIoFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        self.inner.pw_loop.utils.add_io(fd, mask, close, func)
+    }
+
+    pub fn update_io(
+        &self,
+        source: &mut Pin<Box<LoopUtilsSource>>,
+        mask: flags::Io,
+    ) -> std::io::Result<i32> {
+        self.inner.pw_loop.utils.update_io(source, mask)
+    }
+
+    pub fn add_idle(
+        &self,
+        enabled: bool,
+        func: Box<SourceIdleFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        self.inner.pw_loop.utils.add_idle(enabled, func)
+    }
+
+    pub fn enable_idle(
+        &self,
+        source: &mut Pin<Box<LoopUtilsSource>>,
+        enabled: bool,
+    ) -> std::io::Result<i32> {
+        self.inner.pw_loop.utils.enable_idle(source, enabled)
+    }
+
+    pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
+        self.inner.pw_loop.utils.add_event(func)
+    }
+
+    pub fn signal_event(&self, source: &mut Pin<Box<LoopUtilsSource>>) -> std::io::Result<i32> {
+        self.inner.pw_loop.utils.signal_event(source)
+    }
+
+    pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
+        self.inner.pw_loop.utils.add_timer(func)
+    }
+
+    pub fn update_timer(
+        &self,
+        source: &mut Pin<Box<LoopUtilsSource>>,
+        value: &libc::timespec,
+        interval: Option<&libc::timespec>,
+        absolute: bool,
+    ) -> std::io::Result<i32> {
+        self.inner.pw_loop
+            .utils
+            .update_timer(source, value, interval, absolute)
+    }
+
+    pub fn add_signal(
+        &self,
+        signal_number: i32,
+        func: Box<SourceSignalFn>,
+    ) -> Option<Pin<Box<LoopUtilsSource>>> {
+        self.inner.pw_loop.utils.add_signal(signal_number, func)
+    }
+
+    pub fn destroy_source(&self, source: Pin<Box<LoopUtilsSource>>) {
+        self.inner.pw_loop.utils.destroy_source(source)
+    }
+
+    pub fn set_name(&mut self, name: &str) {
+        if let Some(i) = Arc::get_mut(&mut self.inner) {
+            i.pw_loop.name = name.to_string()
+        }
+    }
+
     // TODO: Should this just move to Drop?
     pub fn destroy(self) {
         <InnerMainLoop as Clone>::clone(&self.inner).destroy();
@@ -116,7 +238,7 @@ impl MainLoop {
 
 #[allow(dead_code)]
 #[derive(Clone)]
-pub struct InnerMainLoop {
+struct InnerMainLoop {
     pw_loop: Loop,
     handles: Arc<Handles>,
     hooks: Arc<Mutex<HookList<MainLoopEvents>>>,
@@ -189,10 +311,6 @@ impl InnerMainLoop {
         emit_hook!(self.hooks, destroy,);
     }
 
-    pub fn add_listener(&self, events: MainLoopEvents) {
-        self.hooks.lock().unwrap().append(events);
-    }
-
     fn run(&self, running: Arc<AtomicBool>) {
         assert_eq!(
             running.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed),
@@ -219,129 +337,6 @@ impl InnerMainLoop {
         }
     }
 
-    // Loop control methods
-    pub fn get_fd(&self) -> u32 {
-        self.pw_loop.control.get_fd()
-    }
-
-    pub fn add_hook(&self, hook: &CHook, hooks: &CControlHooks, data: u64) {
-        self.pw_loop.control.add_hook(hook, hooks, data)
-    }
-
-    pub fn enter(&self) {
-        self.pw_loop.control.enter()
-    }
-
-    pub fn leave(&self) {
-        self.pw_loop.control.leave()
-    }
-
-    pub fn iterate(&self, timeout: Option<std::time::Duration>) -> std::io::Result<i32> {
-        self.pw_loop.control.iterate(timeout)
-    }
-
-    pub fn check(&self) -> std::io::Result<i32> {
-        self.pw_loop.control.check()
-    }
-
-    pub fn lock(&self) -> std::io::Result<i32> {
-        self.pw_loop.control.lock()
-    }
-
-    pub fn unlock(&self) -> std::io::Result<i32> {
-        self.pw_loop.control.unlock()
-    }
-
-    pub fn get_time(&self, timeout: std::time::Duration) -> std::io::Result<libc::timespec> {
-        self.pw_loop.control.get_time(timeout)
-    }
-
-    pub fn wait(&self, abstime: &libc::timespec) -> std::io::Result<i32> {
-        self.pw_loop.control.wait(abstime)
-    }
-
-    pub fn signal(&self, wait_for_accept: bool) -> std::io::Result<i32> {
-        self.pw_loop.control.signal(wait_for_accept)
-    }
-
-    pub fn accept(&self) -> std::io::Result<i32> {
-        self.pw_loop.control.accept()
-    }
-
-    // Loop utils
-    pub fn add_io(
-        &self,
-        fd: RawFd,
-        mask: flags::Io,
-        close: bool,
-        func: Box<SourceIoFn>,
-    ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.pw_loop.utils.add_io(fd, mask, close, func)
-    }
-
-    pub fn update_io(
-        &self,
-        source: &mut Pin<Box<LoopUtilsSource>>,
-        mask: flags::Io,
-    ) -> std::io::Result<i32> {
-        self.pw_loop.utils.update_io(source, mask)
-    }
-
-    pub fn add_idle(
-        &self,
-        enabled: bool,
-        func: Box<SourceIdleFn>,
-    ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.pw_loop.utils.add_idle(enabled, func)
-    }
-
-    pub fn enable_idle(
-        &self,
-        source: &mut Pin<Box<LoopUtilsSource>>,
-        enabled: bool,
-    ) -> std::io::Result<i32> {
-        self.pw_loop.utils.enable_idle(source, enabled)
-    }
-
-    pub fn add_event(&self, func: Box<SourceEventFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.pw_loop.utils.add_event(func)
-    }
-
-    pub fn signal_event(&self, source: &mut Pin<Box<LoopUtilsSource>>) -> std::io::Result<i32> {
-        self.pw_loop.utils.signal_event(source)
-    }
-
-    pub fn add_timer(&self, func: Box<SourceTimerFn>) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.pw_loop.utils.add_timer(func)
-    }
-
-    pub fn update_timer(
-        &self,
-        source: &mut Pin<Box<LoopUtilsSource>>,
-        value: &libc::timespec,
-        interval: Option<&libc::timespec>,
-        absolute: bool,
-    ) -> std::io::Result<i32> {
-        self.pw_loop
-            .utils
-            .update_timer(source, value, interval, absolute)
-    }
-
-    pub fn add_signal(
-        &self,
-        signal_number: i32,
-        func: Box<SourceSignalFn>,
-    ) -> Option<Pin<Box<LoopUtilsSource>>> {
-        self.pw_loop.utils.add_signal(signal_number, func)
-    }
-
-    pub fn destroy_source(&self, source: Pin<Box<LoopUtilsSource>>) {
-        self.pw_loop.utils.destroy_source(source)
-    }
-
-    pub fn set_name(&mut self, name: &str) {
-        self.pw_loop.name = name.to_string();
-    }
 }
 
 fn get_support() -> (interface::Support, ffi::plugin::Plugin) {
