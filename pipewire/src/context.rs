@@ -2,15 +2,19 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
 // SPDX-FileCopyrightText: Copyright (c) 2025 Arun Raghavan
 
-use std::{ffi::CStr, sync::LazyLock};
+use std::{
+    ffi::CStr,
+    sync::{Arc, LazyLock},
+};
 
-use crate::{conf, debug, default_topic, keys, log, properties::Properties};
+use crate::{conf, debug, default_topic, keys, log, main_loop::MainLoop, properties::Properties};
 
 use pipewire_native_spa as spa;
 
 default_topic!(log::topic::CONTEXT);
 
 pub struct Context {
+    main_loop: Arc<MainLoop>,
     properties: Properties,
     conf: Properties,
 }
@@ -29,8 +33,9 @@ static PROCESS_NAME: LazyLock<String> = LazyLock::new(|| {
 });
 
 impl Context {
-    pub fn new(properties: Properties) -> std::io::Result<Self> {
+    pub fn new(main_loop: Arc<MainLoop>, properties: Properties) -> std::io::Result<Self> {
         let mut this = Context {
+            main_loop,
             properties,
             conf: Properties::new(),
         };
@@ -70,6 +75,10 @@ impl Context {
         }
 
         Ok(this)
+    }
+
+    pub fn main_loop(&self) -> Arc<MainLoop> {
+        self.main_loop.clone()
     }
 
     fn load_conf(&mut self) -> std::io::Result<()> {
