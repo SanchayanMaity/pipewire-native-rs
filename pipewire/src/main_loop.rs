@@ -51,7 +51,7 @@ unsafe impl Sync for MainLoopEvents {}
 #[derive(Clone)]
 struct Loop {
     system: Arc<Pin<Box<SystemImpl>>>,
-    r#loop: Arc<Pin<Box<LoopImpl>>>,
+    loop_: Arc<Pin<Box<LoopImpl>>>,
     control: Arc<Pin<Box<LoopControlMethodsImpl>>>,
     utils: Arc<Pin<Box<LoopUtilsImpl>>>,
     name: String,
@@ -175,7 +175,7 @@ impl InnerMainLoop {
         Some(InnerMainLoop {
             pw_loop: Loop {
                 system,
-                r#loop: lloop,
+                loop_: lloop,
                 control: lctrl,
                 utils: lutils,
                 name,
@@ -213,7 +213,7 @@ impl InnerMainLoop {
     }
 
     fn quit(&mut self) {
-        if let Some(l) = Arc::get_mut(&mut self.pw_loop.r#loop) {
+        if let Some(l) = Arc::get_mut(&mut self.pw_loop.loop_) {
             let stop = move |_block: bool, _seq: u32, _data: &[u8]| 0;
             let _ = l.invoke(1, &[], false, Box::new(stop));
         }
