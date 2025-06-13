@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) 2025 Asymptotic Inc.
+// SPDX-FileCopyrightText: Copyright (c) 2025 Sanchayan Maity
+
 use pipewire_native_spa as spa;
 use spa::dict::Dict;
 use spa::flags;
@@ -207,7 +211,8 @@ impl MainLoop {
         interval: Option<&libc::timespec>,
         absolute: bool,
     ) -> std::io::Result<i32> {
-        self.inner.pw_loop
+        self.inner
+            .pw_loop
             .utils
             .update_timer(source, value, interval, absolute)
     }
@@ -336,7 +341,6 @@ impl InnerMainLoop {
             let _ = l.invoke(1, &[], false, Box::new(stop));
         }
     }
-
 }
 
 fn get_support() -> (interface::Support, ffi::plugin::Plugin) {
